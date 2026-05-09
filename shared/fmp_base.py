@@ -104,6 +104,8 @@ class FMPClient:
                         print("ERROR: Daily API rate limit reached.", file=sys.stderr)
                     self.rate_limit_reached = True
                     return None
+            elif response.status_code == 404:
+                return None  # endpoint not found — caller decides whether to warn
             else:
                 if not quiet:
                     print(
@@ -305,19 +307,24 @@ class FMPClient:
         if cache_key in self.cache:
             return self.cache[cache_key]
         url = f"{self.STABLE_URL}/institutional-ownership/institutional-holders-by-company"
-        data = self._rate_limited_get(url, {"symbol": symbol})
+        data = self._rate_limited_get(url, {"symbol": symbol}, quiet=True)
         if isinstance(data, list) and data:
             self.cache[cache_key] = data
-        return self.cache.get(cache_key)
+            return data
+        return None
 
     # ------------------------------------------------------------------
     # Fundamental endpoints
     # ------------------------------------------------------------------
 
     def get_income_statement(
-        self, symbol: str, period: str = "quarter", limit: int = 8
+        self, symbol: str, period: str = "quarter", limit: int = 5
     ) -> Optional[list[dict]]:
-        """Income statement (quarterly or annual), most-recent-first."""
+        """Income statement (quarterly or annual), most-recent-first.
+
+        Free-tier cap: limit must be ≤ 5.
+        """
+        limit = min(limit, 5)
         cache_key = f"income_{symbol}_{period}_{limit}"
         if cache_key in self.cache:
             return self.cache[cache_key]
