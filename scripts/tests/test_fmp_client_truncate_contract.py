@@ -3,10 +3,8 @@
 Issue #64 truncate contract: every skill-local copy of `fmp_client.py` must
 respect `days=N` (truncate to at most N rows, most-recent-first).
 
-This test does NOT require all 7 clients to be byte-identical. Each skill has
-diverged with its own public methods (`get_treasury_rates`,
-`get_vix_term_structure`, `get_earnings_calendar`, etc.). What we enforce is
-the shared `get_historical_prices` truncation behavior.
+All skill fmp_client.py files are now thin shims re-exporting from shared/fmp_base.py.
+The patch target is `fmp_base.requests.Session` (where the HTTP call lives).
 """
 
 from __future__ import annotations
@@ -19,6 +17,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+
+# Ensure shared/ is importable so fmp_base can be referenced directly.
+_shared_dir = str(REPO_ROOT / "shared")
+if _shared_dir not in sys.path:
+    sys.path.insert(0, _shared_dir)
 
 FMP_CLIENT_FILES = [
     "skills/canslim-screener/scripts/fmp_client.py",
@@ -74,8 +77,10 @@ def test_get_historical_prices_truncates_to_days(client_path, monkeypatch):
     monkeypatch.setenv("FMP_API_KEY", "test_key")
     module = _load_fmp_module(client_path)
 
+    import fmp_base
+
     mock_response = _build_mock_response(5)
-    with patch.object(module.requests.Session, "get", return_value=mock_response):
+    with patch.object(fmp_base.requests.Session, "get", return_value=mock_response):
         client = module.FMPClient(api_key="test_key")
         # Disable retries to keep the test fast.
         if hasattr(client, "max_retries"):

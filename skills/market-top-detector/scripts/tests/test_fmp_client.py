@@ -1,4 +1,4 @@
-"""Tests for FMP Client VIX term structure auto-detection and endpoint fallback"""
+"""Tests for FMP Client VIX term structure and stable endpoint behavior."""
 
 import os
 import sys
@@ -77,8 +77,8 @@ def _mock_response(status_code, json_data=None, text=""):
     return resp
 
 
-class TestEndpointFallback:
-    """Test stable/v3 endpoint fallback logic in FMPClient."""
+class TestStableEndpoint:
+    """Test stable endpoint behavior in FMPClient."""
 
     def _make_client(self):
         """Create FMPClient with mocked session."""
@@ -89,12 +89,8 @@ class TestEndpointFallback:
         client.RATE_LIMIT_DELAY = 0  # disable rate limiting in tests
         return client
 
-    # ------------------------------------------------------------------
-    # Tier A — Fallback logic (4 tests)
-    # ------------------------------------------------------------------
-
     def test_quote_stable_success(self):
-        """Stable 200 returns data, v3 is NOT called."""
+        """Stable 200 returns data."""
         client = self._make_client()
         quote_data = [{"symbol": "^GSPC", "price": 5500.0}]
 
@@ -102,9 +98,7 @@ class TestEndpointFallback:
 
         def mock_get(url, params=None, timeout=None):
             call_log.append(url)
-            if "stable" in url:
-                return _mock_response(200, quote_data)
-            return _mock_response(403, text="Forbidden")
+            return _mock_response(200, quote_data)
 
         client.session.get = mock_get
         result = client.get_quote("^GSPC")
@@ -113,22 +107,8 @@ class TestEndpointFallback:
         assert len(call_log) == 1
         assert "stable" in call_log[0]
 
-    def test_quote_stable_403_falls_back_to_v3(self):
-        """Stable 403, v3 200 returns v3 data."""
-        client = self._make_client()
-        v3_data = [{"symbol": "^GSPC", "price": 5500.0}]
-
-        def mock_get(url, params=None, timeout=None):
-            if "stable" in url:
-                return _mock_response(403, text="Forbidden")
-            return _mock_response(200, v3_data)
-
-        client.session.get = mock_get
-        result = client.get_quote("^GSPC")
-        assert result == v3_data
-
-    def test_quote_both_fail(self):
-        """Both endpoints 403 returns None."""
+    def test_quote_stable_failure_returns_none(self):
+        """Stable 403 returns None."""
         client = self._make_client()
 
         def mock_get(url, params=None, timeout=None):
@@ -137,161 +117,6 @@ class TestEndpointFallback:
         client.session.get = mock_get
         result = client.get_quote("^GSPC")
         assert result is None
-
-    def test_historical_fallback_to_v3(self):
-        """Stable 403, v3 200 returns v3 data for historical."""
-        client = self._make_client()
-        v3_data = {"symbol": "^GSPC", "historical": [{"date": "2026-03-20", "close": 5500.0}]}
-
-        def mock_get(url, params=None, timeout=None):
-            if "stable" in url:
-                return _mock_response(403, text="Forbidden")
-            return _mock_response(200, v3_data)
-
-        client.session.get = mock_get
-        result = client.get_historical_prices("^GSPC", days=80)
-        assert result == v3_data
-        assert "historical" in result
-
-    # ------------------------------------------------------------------
-    # Tier B — Response normalization (4 tests)
-    # ------------------------------------------------------------------
-
-    def test_historical_stable_v3_format_passthrough(self):
-        """Stable returns v3-compatible format {'historical': [...]} — returned as-is."""
-        client = self._make_client()
-        data = {"symbol": "^GSPC", "historical": [{"date": "2026-03-20", "close": 5500.0}]}
-
-        def mock_get(url, params=None, timeout=None):
-            return _mock_response(200, data)
-
-        client.session.get = mock_get
-        result = client.get_historical_prices("^GSPC", days=80)
-        assert result == data
-
-    def test_historical_stable_batch_format_exact_match(self):
-        """Stable returns historicalStockList with matching symbol — normalized."""
-        client = self._make_client()
-        batch_data = {
-            "historicalStockList": [
-                {
-                    "symbol": "^GSPC",
-                    "historical": [{"date": "2026-03-20", "close": 5500.0}],
-                }
-            ]
-        }
-
-        def mock_get(url, params=None, timeout=None):
-            return _mock_response(200, batch_data)
-
-        client.session.get = mock_get
-        result = client.get_historical_prices("^GSPC", days=80)
-        assert result is not None
-        assert "historical" in result
-        assert result["historical"] == [{"date": "2026-03-20", "close": 5500.0}]
-
-    def test_historical_stable_batch_no_match_falls_back_to_v3(self):
-        """Stable batch has wrong symbol, falls back to v3 which succeeds."""
-        client = self._make_client()
-        batch_data = {
-            "historicalStockList": [
-                {
-                    "symbol": "SPY",
-                    "historical": [{"date": "2026-03-20", "close": 550.0}],
-                }
-            ]
-        }
-        v3_data = {"symbol": "^GSPC", "historical": [{"date": "2026-03-20", "close": 5500.0}]}
-
-        def mock_get(url, params=None, timeout=None):
-            if "stable" in url:
-                return _mock_response(200, batch_data)
-            return _mock_response(200, v3_data)
-
-        client.session.get = mock_get
-        result = client.get_historical_prices("^GSPC", days=80)
-        assert result == v3_data
-
-    def test_historical_batch_no_match_returns_none_when_v3_also_fails(self):
-        """Stable batch no match + v3 403 returns None."""
-        client = self._make_client()
-        batch_data = {
-            "historicalStockList": [
-                {
-                    "symbol": "SPY",
-                    "historical": [{"date": "2026-03-20", "close": 550.0}],
-                }
-            ]
-        }
-
-        def mock_get(url, params=None, timeout=None):
-            if "stable" in url:
-                return _mock_response(200, batch_data)
-            return _mock_response(403, text="Forbidden")
-
-        client.session.get = mock_get
-        result = client.get_historical_prices("^GSPC", days=80)
-        assert result is None
-
-    # ------------------------------------------------------------------
-    # Tier B+ — Shape validation (2 tests)
-    # ------------------------------------------------------------------
-
-    def test_quote_rejects_non_list_response(self):
-        """Stable returns truthy dict — skipped, falls back to v3."""
-        client = self._make_client()
-        error_dict = {"Error Message": "Invalid API KEY."}
-        v3_data = [{"symbol": "^GSPC", "price": 5500.0}]
-
-        def mock_get(url, params=None, timeout=None):
-            if "stable" in url:
-                return _mock_response(200, error_dict)
-            return _mock_response(200, v3_data)
-
-        client.session.get = mock_get
-        result = client.get_quote("^GSPC")
-        assert result == v3_data
-
-    def test_historical_rejects_non_dict_response(self):
-        """Stable returns truthy list — skipped, falls back to v3."""
-        client = self._make_client()
-        bad_data = [1, 2, 3]
-        v3_data = {"symbol": "^GSPC", "historical": [{"date": "2026-03-20", "close": 5500.0}]}
-
-        def mock_get(url, params=None, timeout=None):
-            if "stable" in url:
-                return _mock_response(200, bad_data)
-            return _mock_response(200, v3_data)
-
-        client.session.get = mock_get
-        result = client.get_historical_prices("^GSPC", days=80)
-        assert result == v3_data
-
-    # ------------------------------------------------------------------
-    # Symbol mismatch protection
-    # ------------------------------------------------------------------
-
-    def test_quote_symbol_mismatch_falls_back(self):
-        """Single-symbol quote returning wrong symbol is rejected."""
-        client = self._make_client()
-        wrong = _mock_response(200, [{"symbol": "SPY", "price": 500.0}])
-        correct = _mock_response(200, [{"symbol": "^GSPC", "price": 5000.0}])
-        client.session.get = MagicMock(side_effect=[wrong, correct])
-
-        result = client.get_quote("^GSPC")
-        assert result == [{"symbol": "^GSPC", "price": 5000.0}]
-        assert client.session.get.call_count == 2
-
-    def test_historical_symbol_mismatch_falls_back(self):
-        """Single-symbol historical returning wrong symbol is rejected."""
-        client = self._make_client()
-        wrong = _mock_response(200, {"symbol": "SPY", "historical": [{"close": 500}]})
-        correct = _mock_response(200, {"symbol": "^GSPC", "historical": [{"close": 5000}]})
-        client.session.get = MagicMock(side_effect=[wrong, correct])
-
-        result = client.get_historical_prices("^GSPC", days=80)
-        assert result["symbol"] == "^GSPC"
-        assert client.session.get.call_count == 2
 
     def test_batch_quote_skips_symbol_check(self):
         """Multi-symbol (batch) quote does not apply symbol mismatch check."""
@@ -303,37 +128,6 @@ class TestEndpointFallback:
         result = client.get_quote("^GSPC,^VIX")
         assert result == batch_data
         assert client.session.get.call_count == 1
-
-    # ------------------------------------------------------------------
-    # Skill-specific tests
-    # ------------------------------------------------------------------
-
-    def test_vix_term_structure_works_via_fallback(self):
-        """VIX term structure succeeds when get_quote uses stable->v3 fallback."""
-        client = self._make_client()
-
-        vix_data = [{"symbol": "^VIX", "price": 18.0}]
-        vix3m_data = [{"symbol": "^VIX3M", "price": 20.0}]
-
-        def mock_get(url, params=None, timeout=None):
-            if "stable" in url:
-                return _mock_response(403, text="Forbidden")
-            # v3 fallback: route by symbol in URL path
-            if "^VIX3M" in url:
-                return _mock_response(200, vix3m_data)
-            if "^VIX" in url:
-                return _mock_response(200, vix_data)
-            return _mock_response(404, text="Not Found")
-
-        client.session.get = mock_get
-        result = client.get_vix_term_structure()
-
-        assert result is not None
-        assert result["vix"] == 18.0
-        assert result["vix3m"] == 20.0
-        # 18/20 = 0.9 -> contango
-        assert result["classification"] == "contango"
-        assert result["ratio"] == 0.9
 
     def test_market_top_exits_on_sp500_failure(self):
         """main() exits with code 1 when S&P 500 data unavailable."""

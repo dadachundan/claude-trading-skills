@@ -1180,42 +1180,6 @@ class TestFMPHistoricalNormalizer:
         assert result["historical"][0]["close"] == 401.0
 
     @patch("fmp_base.requests.Session")
-    def test_legacy_v3_dict_passthrough(self, mock_session_class):
-        """v3 fallback dict shape passes normalizer untouched."""
-        mock_session = MagicMock()
-        mock_session.get.return_value = self._mock_response(
-            200,
-            {"symbol": "SPY", "historical": [{"date": "2026-04-29", "close": 501.0}]},
-        )
-        mock_session_class.return_value = mock_session
-        client = self._make_client(mock_session)
-
-        result = client.get_historical_prices("SPY", days=1)
-        assert result is not None
-        assert result["historical"][0]["close"] == 501.0
-
-    @patch("fmp_base.requests.Session")
-    def test_legacy_historicalStockList_still_works(self, mock_session_class):
-        """historicalStockList batch shape still handled by existing branch."""
-        mock_session = MagicMock()
-        mock_session.get.return_value = self._mock_response(
-            200,
-            {
-                "historicalStockList": [
-                    {"symbol": "SPY", "historical": [{"date": "2026-04-29", "close": 501.0}]},
-                    {"symbol": "QQQ", "historical": [{"date": "2026-04-29", "close": 400.0}]},
-                ]
-            },
-        )
-        mock_session_class.return_value = mock_session
-        client = self._make_client(mock_session)
-
-        result = client.get_historical_prices("SPY", days=1)
-        assert result is not None
-        assert result["symbol"] == "SPY"
-        assert result["historical"][0]["close"] == 501.0
-
-    @patch("fmp_base.requests.Session")
     def test_url_uses_eod_endpoint(self, mock_session_class):
         """Regression: stable URL must be /historical-price-eod/full, not /historical-price-full."""
         mock_session = MagicMock()
