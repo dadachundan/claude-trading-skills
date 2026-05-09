@@ -146,6 +146,18 @@ Skills are tested by invoking them in Claude Code conversations:
    - Scripts execute with proper error handling
    - Output matches expected format
 
+### Pushing Changes
+
+After confirming tests pass, always push directly to main:
+
+```bash
+git add <files>
+git commit -m "descriptive message"
+git push origin main
+```
+
+Do not open a PR for routine fixes — push to main directly once tests are green.
+
 ### Code Generation (TDD)
 
 When generating or modifying code in this repository, use a TDD-first workflow:

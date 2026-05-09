@@ -282,9 +282,12 @@ class FMPClient:
         if cache_key in self.cache:
             return self.cache[cache_key]
 
-        url = f"{self.BASE_URL}/earning_calendar"
         params = {"from": from_date, "to": to_date}
-        data = self._rate_limited_get(url, params)
+        # Try stable endpoint first; fall back to v3 for legacy users
+        stable_url = "https://financialmodelingprep.com/stable/earnings-calendar"
+        data = self._rate_limited_get(stable_url, params, quiet=True)
+        if not data:
+            data = self._rate_limited_get(f"{self.BASE_URL}/earning_calendar", params)
         if data:
             self.cache[cache_key] = data
         return data
