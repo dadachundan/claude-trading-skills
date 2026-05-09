@@ -1,67 +1,67 @@
-# ドラッケンミラーの投資哲学と戦略
+# Druckenmiller's Investment Philosophy and Strategy
 
-## 1. ポジション構築とリスク管理の原則
+## 1. Principles of Position Building and Risk Management
 
-### 集中投資の哲学
-- **"ブタ（pig）になる"**: 確信度の高い機会には大胆に集中投資する (Source: *The New Market Wizards*, Jack Schwager, 1992)
-- **分散投資の否定**: 「分散投資はビジネススクールで教える最も誤った概念」 (Source: Lost Tree Club lecture, Jan 2015)
-- **待つ戦略**: 年に1-2回の絶好の機会を待ち、その時に大きく張る (Source: Bloomberg interview, Jun 2023)
-- **格言**: 「卵を一つのかごに入れ、そのかごを注意深く見張れ」
+### Philosophy of Concentrated Investment
+- **"Becoming a Pig"**: Boldly concentrate investments on opportunities with high confidence (Source: *The New Market Wizards*, Jack Schwager, 1992)
+- **Rejection of Diversification**: "Diversification is the most misconception taught in business schools" (Source: Lost Tree Club lecture, Jan 2015)
+- **Waiting Strategy**: Wait for one or two excellent opportunities per year and invest heavily at those times (Source: Bloomberg interview, Jun 2023)
+- **Maxim**: "Put all your eggs in one basket, and keep a close eye on it."
 
-### 資金管理の鉄則
-- **資本保全が最優先**: 大きなドローダウンは絶対に避ける
-- **損失の数学**: 「50%の損失を取り戻すには100%の利益が必要」
-- **メリハリのある投資**:
-  - 平時: 損失ゼロ～数%に抑える
-  - 確信時: +50～60%の大勝を狙う
-- **確信度に応じたポジションサイズ**: 見えない時はバットを振らない
+### Golden Rules of Money Management
+- **Capital Preservation is Top Priority**: Absolutely avoid large drawdowns
+- **The Mathematics of Loss**: "To recover a 50% loss, you need a 100% profit"
+- **Sharp and Focused Investing**:
+- Normal Times: Limit losses to zero or a few percent
+- When Confident: Aim for a big win of +50-60%
+- **Position Sizing According to Confidence**: Don't swing the bat when you can't see it clearly
 
-### 損切りの徹底
-- **即座の撤退**: 投資理由が崩れたら即座にポジションを解消
-- **ソロスの教え**: 「史上最高の損失の切り手」から学んだ損切りの重要性
-- **ヘッジの否定**: 「ヘッジが必要なポジションなら、そもそも持つべきではない」
-- **勝ちトレードの追加**: 利益が乗っている時はより攻める
+### Strict Stop-Loss Execution
+- **Immediate Withdrawal**: Close the position immediately if the investment reason falls apart
+- **Soros's Teachings**: Learned the importance of stop-loss from "the greatest loser in history"
+- **Rejection of Hedging**: "If a position requires hedging, you shouldn't hold it in the first place"
+- **Adding Winning Trades**: Become more aggressive when profits are being made
 
-## 2. 相場観形成のプロセス
+## 2. The Process of Forming Market Views
 
-### マクロ経済分析の視点
-- **18か月先を見る**: 「現在に投資するな、未来に投資せよ」 (Source: Duquesne Capital Annual Letters)
-- **流動性重視**: 「市場を動かすのは企業収益ではなく中央銀行と流動性」 (Source: Lost Tree Club lecture, Jan 2015)
-- **期待の重要性**: 「大事なのは人々がその企業についてこれから何を期待しているか」
+### Macroeconomic Analysis Perspective
+- **Looking 18 Months Ahead**: "Don't invest in the present, invest in the future" (Source: Duquesne Capital Annual Letters)
+- **Emphasis on Liquidity**: "It's not corporate profits that drive the market, but central banks and liquidity" (Source: Lost Tree Club lecture, Jan 2015)
+- **The Importance of Expectations**: "What matters is what people expect from the company going forward."
 
-### 中央銀行の政策分析
-- **政策ミスの察知**: 中央銀行の行き過ぎた政策を見抜く
-- **転換点の予測**: 金融政策の大きな転換点を先読み
-- **歴史的事例**:
-  - 1980年代初頭: ボルカー議長のインフレ抑制を確信し長期国債に集中投資
-  - 2003-2004年: FRBの低金利政策の行き過ぎを警戒
-  - 2007-2008年: 住宅バブル崩壊を予見し準備
+### Central Bank Policy Analysis
+- **Detecting Policy Mistakes**: Identifying excessive policies by the central bank
+- **Predicting Turning Points**: Anticipating major turning points in monetary policy
+- **Historical Examples**:
+- Early 1980s: Concentrated investment in long-term government bonds, confident in Chairman Volcker's inflation control
+- 2003-2004: Caution against the Fed's excessive low-interest rate policy
+- 2007-2008: Foreseeing and preparing for the housing bubble collapse
 
-### グローバル・マルチアセット視点
-- **5-6つの資産バスケット**: 株式・債券・通貨・コモディティを俯瞰
-- **最適な戦場選び**: 最も有利な市場・資産を選択
-- **待つも相場**: 明確な機会がない時は現金比率を高める
-- **ボラティリティ管理**: 日次変動を0.3-0.4%程度に抑える
+### Global Multi-Asset Perspective
+- **5-6 Asset Basket**: An overview of stocks, bonds, currencies, and commodities
+- **Choosing the Optimal Battlefield**: Selecting the most advantageous market and asset
+- **Waiting is Also a Market**: Increase cash holdings when there are no clear opportunities
+- **Volatility Management**: Limit daily fluctuations to approximately 0.3-0.4%
 
-## 3. ベアマーケット戦略
+## 3. Bear Market Strategy
 
-### 弱気相場での優位性
-- **実績**: 「利益の約80%はベアマーケットで稼いだ」
-- **機会の源泉**: 中央銀行の政策ミスによる市場の歪みを突く
+### Advantages in Bear Markets
+- **Results**: "Approximately 80% of profits were earned in bear markets"
+- **Source of Opportunity**: Exploiting market distortions caused by central bank policy mistakes
 
-### 具体的戦術
-- **空売りの難しさ**: 「株式の空売りは非常に難しい」と認識
-- **債券ロング**: 景気後退局面では長期国債で利益を狙う
-- **安全資産シフト**: 国債、金、安定通貨への乗り換え
-- **歪みの活用**: 過剰な悲観から生じる価格歪みを攻めの機会とする
+### Specific Tactics
+- **Difficulty of Short Selling**: Recognizing that "short selling stocks is extremely difficult"
+- **Bond Long**: Aiming for profits in long-term government bonds during economic recessions
+- **Safe-haven Asset Shift**: Switching to government bonds, gold, and stable currencies
+- **Utilizing Distortions**: Turning price distortions arising from excessive pessimism into offensive opportunities
 
-### ベアマーケットの鉄則
-1. **早期察知**: 危機の兆候をいち早く捉える
-2. **防御態勢**: 株式エクスポージャーを急減
-3. **逆張りの勇気**: 過剰反応による歪みに賭ける
-4. **生存最優先**: 大損を避け、次の機会まで生き残る
+### Golden Rules of Bear Markets
+1. **Early Detection**: Quickly identifying signs of crisis
+2. **Defensive Stance**: Sharply reducing stock exposure
+3. **Courage to Contrarian**: Betting on distortions caused by overreactions
+4. **Survival First**: Avoid major losses and survive until the next opportunity.
 
-## 4. Quantitative Rules (定量ルール)
+## 4. Quantitative Rules
 
 ### Position Sizing
 - **Maximum single position:** 25% of portfolio (Maximum Conviction only)
@@ -75,7 +75,7 @@
 
 ### Capital Preservation Thresholds
 - **Maximum drawdown tolerance:** -5% triggers defensive mode
-- **Annual target structure:** 0% in bad years, +30-60% in good years
+- **Annual target structure:** 0% in bad years, +30-60% in Good Years
 - **"Two-strike rule":** Two consecutive losing months → cut all risk to minimum
 
 ### Entry/Exit Quantitative Criteria
@@ -85,20 +85,19 @@
 
 > See `references/conviction_matrix.md` for signal-to-action mapping tables.
 
-## 5. 投資判断の心構え
+## 5. Mindset for Investment Decisions
 
-### オープンマインドと柔軟性
-- **市場の声を聴く**: 自分の予測に固執しない
-- **即座の修正**: 誤りに気づいたら即座に方向転換
-- **謙虚さ**: 市場に対する謙虚な姿勢を保つ
+### Open Mind and Flexibility
+- **Listen to the Market**: Don't cling to your own predictions
+- **Immediate Correction**: Change direction immediately when you realize you've made a mistake
+- **Humility**: Maintain a humble attitude towards the market
 
-### メンタル管理
-- **自己認識**: 「調子が良い時と悪い時を自覚せよ」
-- **調子による調整**:
-  - 不調時: バント程度にとどめる
-  - 好調時: ホームランを狙う
-
-### 長期的成功の秘訣
-- **大胆さと慎重さの両立**: 攻めと守りのメリハリ
-- **忍耐力**: 機会を待つ力
-- **決断力**: チャンスと見たら最大限のリスクを取る勇気
+### Mental Management
+- **Self-Awareness**: "Be aware of your good and bad days."
+- **Adjusting based on your condition**:
+- When you're in a slump: Limit yourself to bunting.
+- When you're in good form: Aim for home runs.
+### Secrets to long-term success
+- **Balancing boldness and caution**: A clear distinction between offense and defense.
+- **Patience**: The ability to wait for opportunities.
+- **Decisiveness**: The courage to take maximum risks when you see an opportunity.

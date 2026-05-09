@@ -1,65 +1,75 @@
-# ドラッケンミラー流市場分析ガイド
+# Druckenmiller-Style Market Analysis Guide
 
-## マクロ経済分析フレームワーク
+## Macroeconomic Analysis Framework
 
-### 1. 中央銀行政策の評価
+### 1. Evaluation of Central Bank Policy
 
-#### 分析ポイント
-- **金利政策の方向性**: 緩和・中立・引き締めのサイクル位置
-- **流動性の変化**: マネーサプライ、QE/QTの動向
-- **政策の持続可能性**: 行き過ぎた政策の兆候を探る
-- **市場期待との乖離**: 中銀の意図と市場の理解のギャップ
+#### Analysis Points
+- **Direction of Interest Rate Policy**: Position in the easing, neutral, and tightening cycle
+- **Changes in Liquidity**: Trends in money supply and QE/QT
+- **Policy Sustainability**: Identifying signs of excessive policy
+- **Deviation from Market Expectations**: The gap between the central bank's intentions and the market's understanding
 
-#### 警戒すべき政策ミスのサイン
-- 長期間の極端な低金利維持
-- インフレ圧力を無視した緩和継続
-- 急激すぎる政策転換
-- 市場との対話の失敗
+#### Signs of Policy Mistakes to Watch Out For
+- Maintaining extremely low interest rates for an extended period
+- Continuing easing while ignoring inflationary pressures
+- Too abrupt policy shifts
+- Failure of dialogue with the market
 
-### 2. 18か月先の未来予測
+### 2. 18-Month Future Forecast
 
-#### 予測の構成要素
-1. **経済サイクルの位置**
-   - 拡大初期・中期・後期・減速・後退のどの段階か
-   - 次の転換点はいつ頃か
+#### Components of the Forecast
+1. **Position in the Economic Cycle**
 
-2. **政策サイクルとの関係**
-   - 金融政策は経済に対して先行的か後追いか
-   - 財政政策の影響度
+- Which stage is it in: early, medium, late, slowdown, or recession?
 
-3. **市場期待の織り込み度**
-   - コンセンサス予想は楽観的か悲観的か
-   - サプライズの可能性はどこにあるか
+- When is the next turning point?
 
-### 3. グローバル資産配分の決定
+2. **Relationship with the Policy Cycle**
 
-#### 資産クラス別評価基準
+- Is monetary policy leading or following the economy?
 
-**株式**
-- 流動性環境（緩和的か引き締め的か）
-- 企業収益の方向性（改善か悪化か）
-- バリュエーション（割高か割安か）
-- センチメント（楽観か悲観か）
+- Impact of Fiscal Policy
 
-**債券**
-- 金利の方向性予測
-- イールドカーブの形状
-- クレジットスプレッドの動向
-- インフレ期待
+3. **Market Expectations Priced In**
 
-**通貨**
-- 金利差の動向
-- 経常収支の状況
-- 政治的安定性
-- 資本フローの方向
+- Is the Consensus Forecast Optimistic or Pessimistic?
 
-**コモディティ**
-- 需給バランス
-- ドルの強弱
-- インフレ/デフレ圧力
-- 地政学リスク
+- Where are the Potential Surprises?
 
-## From Data to Decision (シグナル→アクション変換)
+### 3. Determining Global Asset Allocation
+
+#### Valuation Criteria by Asset Class
+
+**Equities**
+
+- Liquidity Environment (Accommodative or Tightening)
+- Corporate Earnings Trend (Improvement or Deterioration)
+- Valuation (Overvalued or Undervalued)
+- Sentiment (Optimistic or Pessimistic)
+
+**Bonds**
+
+- Interest Rate Direction Forecast
+- Yield Curve Shape
+- Credit Spread Trends
+- Inflation Expectations
+
+**Currencies**
+
+- Interest Rate Differential Trends
+- Current Account Situation
+- Political Stability
+- Capital Flow Direction
+
+**Commodities**
+
+- Supply and Demand Balance
+- Dollar Strength
+- Inflationary/Deflationary Pressures
+- Geopolitical Risks
+
+## From Data to Decision (Signal → Action Conversion)
 
 The Strategy Synthesizer uses the following rules to convert multi-skill signals into actionable decisions. See `references/conviction_matrix.md` for the full cross-reference tables.
 
@@ -91,88 +101,99 @@ The Strategy Synthesizer uses the following rules to convert multi-skill signals
 
 ---
 
-## ポジション構築の実践
+## Practical Position Construction
 
-### 確信度の評価基準
+### Criteria for Evaluating Confidence
 
-#### 高確信度（大きく張る）の条件
-1. **複数の要因が同じ方向を示す**（"ダックが列を成す"）
-2. **市場のコンセンサスと大きく乖離**
-3. **リスク・リワードが非常に有利**
-4. **明確な触媒（カタリスト）が存在**
+#### Conditions for High Confidence (Big Bet)
+1. **Multiple factors point in the same direction** ("Ducks line up")
+2. **Significant deviation from market consensus**
+3. **Very favorable risk-reward**
+4. **Presence of a clear catalyst**
 
-#### 低確信度（様子見）のサイン
-- 相反するシグナルが混在
-- 不確実性が極めて高い
-- リスク・リワードが不明確
-- タイミングが読めない
+#### Signs of Low Confidence (Wait and See)
+- Conflicting signals are mixed
+- Extremely high uncertainty
+- Unclear risk-reward
+- Timing is unpredictable
+### Entry and Exit Decisions
+#### Entry Conditions
+1. **Technical Confirmation**: Confirmation of the early stage of a trend
+2. **Fundamentals**: Clear investment theme
+3. **Sentiment**: Existence of excessive optimism or pessimism
+4. **Risk Management**: Maximum loss is within an acceptable range
 
-### エントリーとエグジットの判断
+#### Exit Conditions
+- **Loss of Investment Reason**: The initial scenario has fallen apart
+- **Target Achievement**: Expected profit has been reached
+- **Better Opportunities**: More attractive investment opportunities emerge elsewhere
+- **Changes in the Risk Environment**: Significant changes in market conditions
 
-#### エントリー条件
-1. **テクニカル確認**: トレンドの初期段階を確認
-2. **ファンダメンタルズ**: 投資テーマが明確
-3. **センチメント**: 過度な楽観・悲観の存在
-4. **リスク管理**: 最大損失が許容範囲内
+## Crisis Response Protocol
 
-#### エグジット条件
-- **投資理由の消失**: 当初のシナリオが崩れた
-- **目標達成**: 想定した利益に到達
-- **より良い機会**: 他により魅力的な投資機会が出現
-- **リスク環境の変化**: 市場環境が大きく変化
+### Signs of a Bear Market
 
-## 危機対応プロトコル
+1. **Turning Point in Monetary Policy**
 
-### ベアマーケット突入の兆候
+- Clear shift from easing to tightening
 
-1. **金融政策の転換点**
-   - 緩和から引き締めへの明確な転換
-   - 流動性の急速な収縮
+- Rapid contraction of liquidity
 
-2. **信用市場のストレス**
-   - クレジットスプレッドの急拡大
-   - 銀行間市場の機能不全
+2. **Credit Market Stress**
 
-3. **センチメントの極端な楽観**
-   - 全員が強気
-   - リスクの過小評価
-   - レバレッジの過剰利用
+- Sharp widening of credit spreads
 
-### 危機時の行動指針
+- Dysfunction in interbank markets
 
-1. **即座の防御態勢**
-   - リスク資産の削減
-   - レバレッジの解消
-   - 流動性の確保
+3. **Extreme Optimism in Sentiment**
 
-2. **安全資産へのシフト**
-   - 長期国債
-   - 金
-   - 安全通貨（円、スイスフラン等）
+- Bullishness
+- Underestimation of Risk
 
-3. **逆張り機会の探索**
-   - 過度な売りによる歪み
-   - 質への逃避による優良資産の割安化
-   - 政策対応による転換点
+- Excessive Leverage
 
-## 日常的なモニタリング項目
+### Guidelines for Action During a Crisis
 
-### 毎日チェックすべき指標
-- 主要国の金利動向
-- 株式市場の内部構造（上昇/下落銘柄数等）
-- 通貨市場の動き
-- VIX等のボラティリティ指標
-- クレジット市場の動向
+1. **Immediate Defensive Stance**
 
-### 週次・月次でレビューすべき項目
-- 経済指標の予想と実績の乖離
-- 中央銀行高官の発言トーン
-- 資金フローデータ
-- ポジショニングデータ
-- センチメント指標
+- Reduction of risk assets
 
-### 四半期ごとの大局観チェック
-- 投資テーマの妥当性確認
-- 18か月先予測の修正
-- ポートフォリオ全体のリスク評価
-- 新たな投資機会の発掘
+- Unleveraging
+
+- Ensuring Liquidity
+
+2. **Shift to Safe-Haven Assets**
+
+- Long-term government bonds
+
+- Gold
+
+- Safe-haven currencies (yen, Swiss franc, etc.)
+
+3. **Exploring Contrarian Opportunities**
+
+- Distortions due to excessive selling
+- Undervaluation of high-quality assets due to flight to quality
+- Turning points due to policy responses
+
+## Daily Monitoring Items
+
+### Indicators to Check Daily
+- Interest Rate Trends in Major Countries
+- Internal Structure of Stock Markets (Number of Rising/Falling Stocks, etc.)
+- Currency Market Movements
+- Volatility Indicators such as VIX
+- Credit Market Trends
+
+### Items to Review Weekly and Monthly
+- Discrepancy between Expected and Actual Economic Indicators
+- Tone of Central Bank Officials' Statements
+- Fund Flow Data
+- Positioning Data
+- Sentiment Indicators
+
+### Quarterly Overview Check
+- Confirmation of Investment Theme Validity
+- Revision of 18-Month Forecast
+- Overall Portfolio Risk Assessment
+- Discovery of New Investment Opportunities
