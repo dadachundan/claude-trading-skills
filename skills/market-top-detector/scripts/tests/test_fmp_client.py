@@ -523,7 +523,7 @@ class TestEODFlatListSuccess:
         client.max_retries = 0
         return client
 
-    @patch("fmp_client.requests.Session")
+    @patch("fmp_base.requests.Session")
     def test_get_historical_prices_normalizes_flat_list(self, mock_session_class):
         """Flat list response from new EOD endpoint -> dict contract preserved."""
         mock_session = MagicMock()

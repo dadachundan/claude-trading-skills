@@ -840,7 +840,7 @@ class TestReportGenerator:
 class TestFMPClient:
     """Test FMP client error handling and budget enforcement."""
 
-    @patch("fmp_client.requests.Session")
+    @patch("fmp_base.requests.Session")
     def test_api_429_retry(self, mock_session_cls):
         """429 response triggers retry, sets rate_limit_reached on second failure."""
         mock_session = MagicMock()
@@ -858,7 +858,7 @@ class TestFMPClient:
         assert result is None
         assert client.rate_limit_reached is True
 
-    @patch("fmp_client.requests.Session")
+    @patch("fmp_base.requests.Session")
     def test_api_timeout(self, mock_session_cls):
         """requests.Timeout returns None without crashing."""
         import requests as req

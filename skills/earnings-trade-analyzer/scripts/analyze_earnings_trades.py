@@ -278,7 +278,7 @@ def main():
         )
 
         try:
-            daily_prices = client.get_historical_prices(symbol, days=250)
+            price_data = client.get_historical_prices(symbol, days=250)
         except ApiCallBudgetExceeded:
             print(
                 f"\nWARNING: API budget exceeded at {symbol}. "
@@ -287,6 +287,7 @@ def main():
             )
             break
 
+        daily_prices = price_data.get("historical") if price_data else None
         if not daily_prices or len(daily_prices) < 50:
             print(
                 f" SKIP (insufficient data: {len(daily_prices) if daily_prices else 0} days)",
@@ -309,7 +310,7 @@ def main():
             print(f" SKIP (gap {gap_pct:.1f}% < min {args.min_gap}%)", file=sys.stderr)
             continue
 
-        current_price = daily_prices[0]["close"] if daily_prices else candidate["price"]
+        current_price = daily_prices[0]["close"] if daily_prices else candidate["price"]  # type: ignore[index]
 
         result = {
             "symbol": symbol,

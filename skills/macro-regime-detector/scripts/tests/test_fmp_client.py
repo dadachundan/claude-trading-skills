@@ -24,7 +24,7 @@ def _mock_response(status_code, json_payload):
 
 
 class TestEODFlatListSuccess:
-    @patch("fmp_client.requests.Session")
+    @patch("fmp_base.requests.Session")
     def test_get_historical_prices_normalizes_flat_list(self, mock_session_class):
         """Flat list response -> dict contract preserved."""
         mock_session = MagicMock()

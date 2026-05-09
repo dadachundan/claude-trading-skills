@@ -1,8 +1,8 @@
-"""Issue #64: stable/historical-price-eod/full normalization for earnings-trade-analyzer.
+"""stable/historical-price-eod/full normalization for earnings-trade-analyzer.
 
-This skill's `get_historical_prices()` returns Optional[list[dict]] (NOT dict),
-unlike the other 6 fmp_client implementations. The public method extracts
-`data["historical"]` from the normalizer output. This test pins that contract.
+get_historical_prices() returns the standard dict contract:
+{"symbol": "SPY", "historical": [...]}
+Callers must extract ["historical"] themselves.
 """
 
 import os
@@ -29,9 +29,9 @@ def _mock_response(status_code, json_payload):
 
 
 class TestEODFlatListSuccess:
-    @patch("fmp_client.requests.Session")
-    def test_get_historical_prices_returns_list(self, mock_session_class):
-        """Flat list response -> public method returns list (NOT dict)."""
+    @patch("fmp_base.requests.Session")
+    def test_get_historical_prices_returns_dict(self, mock_session_class):
+        """Flat list response from stable endpoint -> normalised to standard dict."""
         mock_session = MagicMock()
         mock_session.get.return_value = _mock_response(
             200,
@@ -62,14 +62,14 @@ class TestEODFlatListSuccess:
         client.session = mock_session
 
         result = client.get_historical_prices("SPY", days=2)
-        # CRITICAL: this skill returns list, not dict
-        assert isinstance(result, list), (
-            f"expected list (skill contract), got {type(result).__name__}"
+        assert isinstance(result, dict), (
+            f"expected dict, got {type(result).__name__}"
         )
-        assert len(result) == 2
-        assert result[0]["date"] == "2026-04-29"
-        assert result[0]["close"] == 501.0
-        assert "symbol" not in result[0], "row-level symbol should be stripped"
+        rows = result["historical"]
+        assert len(rows) == 2
+        assert rows[0]["date"] == "2026-04-29"
+        assert rows[0]["close"] == 501.0
+        assert "symbol" not in rows[0], "row-level symbol should be stripped"
 
         # URL regression
         first_call = mock_session.get.call_args_list[0]
