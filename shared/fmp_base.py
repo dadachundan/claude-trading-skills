@@ -33,7 +33,6 @@ class ApiCallBudgetExceeded(Exception):
 class FMPClient:
     """FMP API client using stable endpoints, with rate limiting and caching."""
 
-    BASE_URL = "https://financialmodelingprep.com/api/v3"
     STABLE_URL = "https://financialmodelingprep.com/stable"
     RATE_LIMIT_DELAY = 0.3  # seconds between requests
 
@@ -232,27 +231,30 @@ class FMPClient:
     # ------------------------------------------------------------------
 
     def get_profile(self, symbol: str) -> Optional[list[dict]]:
-        """Company profile as a raw list (v3 shape)."""
+        """Company profile as a raw list."""
         cache_key = f"profile_list_{symbol}"
         if cache_key in self.cache:
             return self.cache[cache_key]
-        url = f"{self.BASE_URL}/profile/{symbol}"
-        data = self._rate_limited_get(url)
-        if data:
+        url = f"{self.STABLE_URL}/profile"
+        data = self._rate_limited_get(url, {"symbol": symbol})
+        if isinstance(data, list) and data:
             self.cache[cache_key] = data
-        return data
+        elif isinstance(data, dict) and data:
+            data = [data]
+            self.cache[cache_key] = data
+        else:
+            return None
+        return self.cache[cache_key]
 
     def get_company_profile(self, symbol: str) -> Optional[dict]:
         """Company profile as a single unwrapped dict."""
         cache_key = f"profile_{symbol}"
         if cache_key in self.cache:
             return self.cache[cache_key]
-        url = f"{self.BASE_URL}/profile/{symbol}"
-        data = self._rate_limited_get(url)
-        if isinstance(data, list) and data:
-            profile = data[0]
-            self.cache[cache_key] = profile
-            return profile
+        profiles = self.get_profile(symbol)
+        if profiles:
+            self.cache[cache_key] = profiles[0]
+            return profiles[0]
         return None
 
     def get_company_profiles(self, symbols: list[str]) -> dict[str, dict]:
@@ -266,9 +268,9 @@ class FMPClient:
                 for profile in self.cache[cache_key]:
                     results[profile["symbol"]] = profile
                 continue
-            url = f"{self.BASE_URL}/profile/{batch_str}"
-            data = self._rate_limited_get(url)
-            if data:
+            url = f"{self.STABLE_URL}/profile"
+            data = self._rate_limited_get(url, {"symbol": batch_str})
+            if isinstance(data, list) and data:
                 self.cache[cache_key] = data
                 for profile in data:
                     results[profile["symbol"]] = profile
@@ -291,22 +293,22 @@ class FMPClient:
         cache_key = "sp500_constituents"
         if cache_key in self.cache:
             return self.cache[cache_key]
-        url = f"{self.BASE_URL}/sp500_constituent"
+        url = f"{self.STABLE_URL}/sp500-constituent"
         data = self._rate_limited_get(url)
-        if data:
+        if isinstance(data, list) and data:
             self.cache[cache_key] = data
-        return data
+        return self.cache.get(cache_key)
 
     def get_institutional_holders(self, symbol: str) -> Optional[list[dict]]:
         """13F institutional holder data."""
         cache_key = f"institutional_{symbol}"
         if cache_key in self.cache:
             return self.cache[cache_key]
-        url = f"{self.BASE_URL}/institutional-holder/{symbol}"
-        data = self._rate_limited_get(url)
-        if data:
+        url = f"{self.STABLE_URL}/institutional-ownership/institutional-holders-by-company"
+        data = self._rate_limited_get(url, {"symbol": symbol})
+        if isinstance(data, list) and data:
             self.cache[cache_key] = data
-        return data
+        return self.cache.get(cache_key)
 
     # ------------------------------------------------------------------
     # Fundamental endpoints
@@ -319,11 +321,11 @@ class FMPClient:
         cache_key = f"income_{symbol}_{period}_{limit}"
         if cache_key in self.cache:
             return self.cache[cache_key]
-        url = f"{self.BASE_URL}/income-statement/{symbol}"
-        data = self._rate_limited_get(url, {"period": period, "limit": limit})
-        if data:
+        url = f"{self.STABLE_URL}/income-statement"
+        data = self._rate_limited_get(url, {"symbol": symbol, "period": period, "limit": limit})
+        if isinstance(data, list) and data:
             self.cache[cache_key] = data
-        return data
+        return self.cache.get(cache_key)
 
     # ------------------------------------------------------------------
     # Macro / rates endpoints
