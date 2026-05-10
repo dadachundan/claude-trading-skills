@@ -1,13 +1,13 @@
 """Tests for Earnings Calendar scripts.
 
 Covers:
-- FMPEarningsCalendar helper methods (no API calls)
+- FinnhubEarningsCalendar helper methods (no API calls)
 - Date validation
 - Report generation (generate_report.py pure functions)
 """
 
 import pytest
-from fetch_earnings_fmp import FMPEarningsCalendar, validate_date
+from fetch_earnings_finnhub import FinnhubEarningsCalendar, validate_date
 from generate_report import (
     calculate_summary_stats,
     format_revenue,
@@ -21,8 +21,8 @@ from generate_report import (
 
 @pytest.fixture
 def client():
-    """FMP client with dummy API key (no API calls made)."""
-    return FMPEarningsCalendar(api_key="dummy-key")
+    """Finnhub client with dummy API key (no API calls made)."""
+    return FinnhubEarningsCalendar(api_key="dummy-key")
 
 
 @pytest.fixture
@@ -37,10 +37,10 @@ def sample_earnings():
             "marketCap": 3_000_000_000_000,
             "marketCapFormatted": "$3.0T",
             "sector": "Technology",
-            "industry": "Consumer Electronics",
+            "industry": "Technology",
             "epsEstimated": 1.55,
             "revenueEstimated": 89_500_000_000,
-            "exchange": "NASDAQ",
+            "exchange": "NASDAQ/NMS (GLOBAL MARKET)",
         },
         {
             "symbol": "MSFT",
@@ -50,10 +50,10 @@ def sample_earnings():
             "marketCap": 2_500_000_000_000,
             "marketCapFormatted": "$2.5T",
             "sector": "Technology",
-            "industry": "Software",
+            "industry": "Technology",
             "epsEstimated": 2.80,
             "revenueEstimated": 60_000_000_000,
-            "exchange": "NASDAQ",
+            "exchange": "NASDAQ/NMS (GLOBAL MARKET)",
         },
         {
             "symbol": "JNJ",
@@ -63,10 +63,10 @@ def sample_earnings():
             "marketCap": 400_000_000_000,
             "marketCapFormatted": "$400.0B",
             "sector": "Healthcare",
-            "industry": "Drug Manufacturers",
+            "industry": "Healthcare",
             "epsEstimated": 2.60,
             "revenueEstimated": 22_000_000_000,
-            "exchange": "NYSE",
+            "exchange": "New York Stock Exchange",
         },
     ]
 
@@ -75,15 +75,17 @@ def sample_earnings():
 
 
 class TestNormalizeTiming:
-    def test_bmo_variants(self, client):
+    def test_bmo(self, client):
         assert client.normalize_timing("bmo") == "BMO"
-        assert client.normalize_timing("pre-market") == "BMO"
-        assert client.normalize_timing("before market open") == "BMO"
+        assert client.normalize_timing("BMO") == "BMO"
 
-    def test_amc_variants(self, client):
+    def test_amc(self, client):
         assert client.normalize_timing("amc") == "AMC"
-        assert client.normalize_timing("after-market") == "AMC"
-        assert client.normalize_timing("after market close") == "AMC"
+        assert client.normalize_timing("AMC") == "AMC"
+
+    def test_dmh_returns_tas(self, client):
+        # "during market hours" → treat as TAS
+        assert client.normalize_timing("dmh") == "TAS"
 
     def test_none_returns_tas(self, client):
         assert client.normalize_timing(None) == "TAS"
@@ -113,27 +115,27 @@ class TestFormatMarketCap:
 
 
 # ── filter_by_market_cap ──────────────────────────────────────────────
+# Finnhub profile: marketCapitalization in millions, country field for US filter
 
 
 class TestFilterByMarketCap:
     def test_filters_below_2b(self, client):
-        earnings = [
-            {"symbol": "BIG"},
-            {"symbol": "SMALL"},
-        ]
+        earnings = [{"symbol": "BIG"}, {"symbol": "SMALL"}]
         profiles = {
-            "BIG": {"marketCap": 10_000_000_000, "exchange": "NYSE"},
-            "SMALL": {"marketCap": 500_000_000, "exchange": "NYSE"},
+            # 10 000M = $10B
+            "BIG": {"marketCapitalization": 10_000, "country": "US", "ticker": "BIG"},
+            # 500M = $500M < $2B
+            "SMALL": {"marketCapitalization": 500, "country": "US", "ticker": "SMALL"},
         }
         result = client.filter_by_market_cap(earnings, profiles)
         assert len(result) == 1
         assert result[0]["symbol"] == "BIG"
 
-    def test_filters_non_us_exchanges(self, client):
+    def test_filters_non_us_stocks(self, client):
         earnings = [{"symbol": "US"}, {"symbol": "UK"}]
         profiles = {
-            "US": {"marketCap": 5_000_000_000, "exchange": "NYSE"},
-            "UK": {"marketCap": 5_000_000_000, "exchange": "LSE"},
+            "US": {"marketCapitalization": 5_000, "country": "US", "ticker": "US"},
+            "UK": {"marketCapitalization": 5_000, "country": "GB", "ticker": "UK"},
         }
         result = client.filter_by_market_cap(earnings, profiles)
         assert len(result) == 1
@@ -149,15 +151,17 @@ class TestFilterByMarketCap:
         earnings = [{"symbol": "AAPL"}]
         profiles = {
             "AAPL": {
-                "marketCap": 3_000_000_000_000,
-                "companyName": "Apple Inc.",
-                "sector": "Technology",
-                "industry": "Consumer Electronics",
-                "exchange": "NASDAQ",
+                # 3 000 000M = $3T
+                "marketCapitalization": 3_000_000,
+                "name": "Apple Inc",
+                "finnhubIndustry": "Technology",
+                "country": "US",
+                "exchange": "NASDAQ/NMS (GLOBAL MARKET)",
+                "ticker": "AAPL",
             },
         }
         result = client.filter_by_market_cap(earnings, profiles)
-        assert result[0]["companyName"] == "Apple Inc."
+        assert result[0]["companyName"] == "Apple Inc"
         assert result[0]["sector"] == "Technology"
 
 

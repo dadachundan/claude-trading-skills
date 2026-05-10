@@ -38,22 +38,22 @@ from calculators.ma50_calculator import calculate_ma50_position
 from calculators.ma200_calculator import calculate_ma200_position
 from calculators.pre_earnings_trend_calculator import calculate_pre_earnings_trend
 from calculators.volume_trend_calculator import calculate_volume_trend
+from finnhub_client import FinnhubClient
 from report_generator import generate_json_report, generate_markdown_report
 from scorer import calculate_composite_score
-from yahoo_finance_client import YahooFinanceClient
 
 
 def normalize_timing(time_value):
-    """Normalize timing field to bmo/amc/unknown."""
+    """Normalize Finnhub hour field to bmo/amc/unknown."""
     if not time_value:
         return "unknown"
     t = time_value.lower().strip()
-    if t in ("bmo", "pre-market", "before market open"):
+    if t == "bmo":
         return "bmo"
-    elif t in ("amc", "after-market", "after market close"):
+    elif t == "amc":
         return "amc"
     else:
-        return "unknown"
+        return "unknown"  # "dmh" (during market hours) and empty string
 
 
 def analyze_stock(daily_prices, earnings_date, timing):
@@ -154,14 +154,27 @@ def main():
         default="reports/",
         help="Output directory (default: reports/)",
     )
+    parser.add_argument(
+        "--api-key",
+        metavar="KEY",
+        help="Finnhub API key (default: $FINNHUB_API_KEY env var)",
+    )
 
     args = parser.parse_args()
 
-    client = YahooFinanceClient()
+    api_key = args.api_key or os.environ.get("FINNHUB_API_KEY")
+    if not api_key:
+        print(
+            "ERROR: Finnhub API key required. Set FINNHUB_API_KEY env var or pass --api-key.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    client = FinnhubClient(api_key)
 
     print("=" * 60, file=sys.stderr)
     print("Earnings Trade Analyzer - 5-Factor Scoring", file=sys.stderr)
-    print("Data source: Yahoo Finance (free, no API key required)", file=sys.stderr)
+    print("Data source: Finnhub API", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
 
     # Phase 1: Fetch earnings calendar and profiles
@@ -204,11 +217,10 @@ def main():
             continue
 
         market_cap = profile.get("mktCap", 0)
-        exchange = profile.get("exchangeShortName", "")
 
         if market_cap < args.min_market_cap:
             continue
-        if exchange not in YahooFinanceClient.US_EXCHANGES:
+        if profile.get("country", "") != "US":
             continue
 
         seen.add(symbol)
@@ -332,7 +344,7 @@ def main():
         "generated_at": datetime.now().isoformat(),
         "generator": "earnings-trade-analyzer",
         "generator_version": "2.0.0",
-        "data_source": "yahoo_finance",
+        "data_source": "finnhub",
         "lookback_days": args.lookback_days,
         "total_screened": len(all_results),
         "min_market_cap": args.min_market_cap,

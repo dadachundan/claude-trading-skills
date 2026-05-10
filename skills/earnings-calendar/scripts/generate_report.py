@@ -184,7 +184,7 @@ def generate_report(earnings: list[dict]) -> str:
     report = f"""# Upcoming Earnings Calendar - Week of {date_range}
 
 **Report Generated**: {datetime.now().strftime("%B %d, %Y")}
-**Data Source**: FMP API (US stocks, Mid-cap and above, >$2B market cap)
+**Data Source**: Finnhub API (US stocks, Mid-cap and above, >$2B market cap)
 **Coverage Period**: Next 7 days
 **Total Companies**: {stats["total"]}
 
@@ -293,23 +293,23 @@ def generate_report(earnings: list[dict]) -> str:
 
 - **Filter Criteria**: This report includes US companies with market cap $2B and above (mid-cap+) with earnings scheduled for the next week.
 
-- **Data Source**: Financial Modeling Prep (FMP) API
+- **Data Source**: Finnhub API
 
 - **Data Freshness**: Earnings dates and times can change. Verify critical dates through company investor relations websites for the most current information.
 
-- **EPS and Revenue Estimates**: Analyst consensus estimates from FMP API. Actual results will be reported on earnings date.
+- **EPS and Revenue Estimates**: Analyst consensus estimates from Finnhub API. Actual results will be reported on earnings date.
 
 ---
 
 ## Additional Resources
 
-- **FMP API Documentation**: https://site.financialmodelingprep.com/developer/docs
+- **Finnhub API Documentation**: https://finnhub.io/docs/api/earnings-calendar
 - **Seeking Alpha Calendar**: https://seekingalpha.com/earnings/earnings-calendar
 - **Yahoo Finance Calendar**: https://finance.yahoo.com/calendar/earnings
 
 ---
 
-*Report generated using FMP Earnings Calendar API with US stocks mid-cap+ filter (>$2B market cap). Data current as of report generation time. Always verify earnings dates through official company sources.*
+*Report generated using Finnhub Earnings Calendar API with US stocks mid-cap+ filter (>$2B market cap). Data current as of report generation time. Always verify earnings dates through official company sources.*
 """
 
     return report

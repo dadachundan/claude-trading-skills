@@ -216,7 +216,7 @@ pre-commit install && pre-commit install --hook-type pre-push
 | Skill | FMP API | FINVIZ Elite | Alpaca | Notes |
 |-------|---------|--------------|--------|-------|
 | **Economic Calendar Fetcher** | ✅ Required | ❌ Not used | ❌ Not used | Fetches economic events from FMP |
-| **Earnings Calendar** | ✅ Required | ❌ Not used | ❌ Not used | Fetches earnings dates from FMP |
+| **Earnings Calendar** | ❌ Not used | ❌ Not used | ❌ Not used | Fetches earnings dates from Finnhub (free, 60 calls/min) |
 | **Institutional Flow Tracker** | ✅ Required | ❌ Not used | ❌ Not used | 13F filings analysis; free tier sufficient |
 | **Value Dividend Screener** | ✅ Required | 🟡 Optional (Recommended) | ❌ Not used | FMP for analysis; FINVIZ reduces execution time by 70-80% |
 | **Dividend Growth Pullback Screener** | ✅ Required | 🟡 Optional (Recommended) | ❌ Not used | FMP for analysis; FINVIZ for RSI pre-screening |
@@ -326,13 +326,14 @@ python3 economic-calendar-fetcher/scripts/get_economic_calendar.py \
   --format json
 ```
 
-**Earnings Calendar:** ⚠️ Requires FMP API key
+**Earnings Calendar:** Requires Finnhub API key (free tier)
 ```bash
 # Default: next 7 days, market cap > $2B
-python3 earnings-calendar/scripts/fetch_earnings_fmp.py --api-key YOUR_KEY
+export FINNHUB_API_KEY="your-key"
+python3 earnings-calendar/scripts/fetch_earnings_finnhub.py
 
 # Custom date range
-python3 earnings-calendar/scripts/fetch_earnings_fmp.py \
+python3 earnings-calendar/scripts/fetch_earnings_finnhub.py \
   --from 2025-11-01 --to 2025-11-07 \
   --api-key YOUR_KEY
 ```
