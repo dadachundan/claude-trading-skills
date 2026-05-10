@@ -148,12 +148,13 @@ Skills are tested by invoking them in Claude Code conversations:
 
 ### Pushing Changes
 
-After confirming tests pass, always push directly to main:
+After confirming tests pass, always push directly to main and update local main to match:
 
 ```bash
 git add <files>
 git commit -m "descriptive message"
 git push origin main
+git fetch origin main && git branch -f main origin/main
 ```
 
 Do not open a PR for routine fixes — push to main directly once tests are green.
