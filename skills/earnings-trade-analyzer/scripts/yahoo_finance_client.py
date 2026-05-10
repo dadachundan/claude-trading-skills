@@ -44,7 +44,7 @@ class YahooFinanceClient:
 
     RATE_LIMIT_DELAY = 0.3  # seconds between requests
 
-    PROFILE_WORKERS = 5  # parallel threads for profile fetching
+    PROFILE_WORKERS = 2  # parallel threads for profile fetching
 
     # SEC EDGAR EFTS full-text search
     EDGAR_EFTS_URL = "https://efts.sec.gov/LATEST/search-index"
