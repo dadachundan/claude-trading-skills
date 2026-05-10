@@ -1,104 +1,96 @@
----
-description: "ニュースヘッドラインから18ヶ月シナリオを分析。1次/2次/3次影響、推奨銘柄、セカンドオピニオンを含む包括的レポートを日本語で生成。"
-argument-hint: "<headline>"
+--- Description: "Analyzes 18-month scenarios from news headlines. Generates a comprehensive report in Japanese including primary/secondary/tertiary impacts, recommended stocks, and second opinions."
+Argument-hint: "<headline>"
 ---
 
 # Scenario Analyzer
 
-ニュースヘッドラインから18ヶ月シナリオを分析し、セクター・銘柄への影響を評価します。
+Analyzes 18-month scenarios from news headlines and evaluates their impact on sectors and stocks.
 
-## 引数
-
+## Arguments
 ```
 $ARGUMENTS
 ```
+**Argument Interpretation**:
+- If a headline is included: The headline will be included in the analysis.
+- If the argument is empty: The user will be prompted to enter a headline.
 
-**引数の解釈**:
-- ヘッドラインが含まれる場合: そのヘッドラインを分析対象とする
-- 引数が空の場合: ユーザーにヘッドラインの入力を求める
+**Usage Examples**:
+- `/scenario-analyzer Fed raises rates by 50bp` → Analyzes the Fed interest rate hike scenario.
+- `/scenario-analyzer China announces new tariffs on US semiconductors` → Analyzes the tariff scenario.
+- `/scenario-analyzer OPEC+ agrees to cut oil production` → Analyzes the oil production cut scenario.
+- `/scenario-analyzer` → Prompts for headline input before analysis.
 
-**使用例**:
-- `/scenario-analyzer Fed raises rates by 50bp` → Fed利上げシナリオを分析
-- `/scenario-analyzer China announces new tariffs on US semiconductors` → 関税シナリオを分析
-- `/scenario-analyzer OPEC+ agrees to cut oil production` → 原油減産シナリオを分析
-- `/scenario-analyzer` → ヘッドライン入力を求めてから分析
+## Analysis Content
 
-## 分析内容
-
-| 項目 | 説明 |
+| Item | Description |
 |------|------|
-| **関連ニュース** | WebSearchで過去2週間の関連記事を収集 |
-| **シナリオ** | Base/Bull/Bear の3シナリオ（確率付き） |
-| **影響分析** | 1次・2次・3次のセクター影響 |
-| **銘柄選定** | ポジティブ/ネガティブ各3-5銘柄（米国市場） |
-| **レビュー** | セカンドオピニオン（見落とし・バイアス指摘） |
+| **Related News** | Collects related articles from the past two weeks using WebSearch |
+| **Scenario** | Three scenarios (Base/Bull/Bear) with probabilities |
+| **Impact Analysis** | Primary, Secondary, and Tertiary Sector Impacts |
+| **Stock Selection** | 3-5 Positive/Negative Stocks (US Market) |
+| **Review** | Second Opinion (Identifying Oversights and Biases) |
 
-## 実行手順
+## Execution Procedure
 
-1. **ヘッドライン解析**:
-   - 引数からヘッドラインを抽出
-   - 引数が空の場合はユーザーに入力を求める
-   - イベントタイプを分類（金融政策/地政学/規制/テクノロジー/コモディティ/企業）
+1. **Headline Analysis**:
+- Extract headlines from arguments
+- Prompt user input if arguments are empty
+- Classify event types (Financial Policy/Geopolitics/Regulation/Technology/Commodities/Companies)
 
-2. **リファレンス読み込み**:
-   ```
-   Read skills/scenario-analyzer/references/headline_event_patterns.md
-   Read skills/scenario-analyzer/references/sector_sensitivity_matrix.md
-   Read skills/scenario-analyzer/references/scenario_playbooks.md
-   ```
+2. **Reference Reading**:
+```
+Read skills/scenario-analyzer/references/headline_event_patterns.md
+Read skills/scenario-analyzer/references/sector_sensitivity_matrix.md
+Read skills/scenario-analyzer/references/scenario_playbooks.md
+```
+3. **Main Analysis (scenario-analyst Agent)**:
+```
+Agent Tool:
+- subagent_type: "scenario-analyst"
+- prompt: Headline + Event Type + Reference Information
+``
+Output:
+- List of Related News Articles
+- 3 Scenarios (Base/Bull/Bear)
+- Sector Impact Analysis (1st/2nd/3rd)
+- Stock Recommendation List
 
-3. **メイン分析（scenario-analyst エージェント）**:
-   ```
-   Agent tool:
-   - subagent_type: "scenario-analyst"
-   - prompt: ヘッドライン + イベントタイプ + リファレンス情報
-   ```
+4. **Second Opinion (strategy-reviewer agent)**:
+``
+Agent tool:
+- subagent_type: "strategy-reviewer"
+- prompt: Full Analysis Results from Step 3
+``
+Output:
+- Identification of Oversights
+- Opinion on Scenario Probability
+- Bias Detection
+- Suggestion of Alternative Scenarios
 
-   出力:
-   - 関連ニュース記事リスト
-   - 3シナリオ（Base/Bull/Bear）
-   - セクター影響分析（1次/2次/3次）
-   - 銘柄推奨リスト
+5. **Report Generation**:
+- Integrate Results from Both Agents
+- Add Final Investment Decision
+- Save to `reports/scenario_analysis_<topic>_YYYYMMDD.md`
+## Reference Resources
+- `skills/scenario-analyzer/references/headline_event_patterns.md` - Event Patterns
+- `skills/scenario-analyzer/references/sector_sensitivity_matrix.md` - Sector Sensitivity
+- `skills/scenario-analyzer/references/scenario_playbooks.md` - Scenario Templates
 
-4. **セカンドオピニオン（strategy-reviewer エージェント）**:
-   ```
-   Agent tool:
-   - subagent_type: "strategy-reviewer"
-   - prompt: Step 3の分析結果全文
-   ```
+## Important Instructions
 
-   出力:
-   - 見落としの指摘
-   - シナリオ確率への意見
-   - バイアスの検出
-   - 代替シナリオの提案
+- **Language**: All analysis and output will be in **Japanese**
+- **Target Market**: Stock selection is limited to **US-listed stocks**
+- **Timeframe**: Scenarios cover **18 months**
+- **Probability**: Base + Bull + Bear = **100%**
+- **Second Opinion**: **Required** to perform (always call strategy-reviewer)
 
-5. **レポート生成**:
-   - 両エージェントの結果を統合
-   - 最終投資判断を追記
-   - `reports/scenario_analysis_<topic>_YYYYMMDD.md` に保存
+## Output
 
-## 参照リソース
-
-- `skills/scenario-analyzer/references/headline_event_patterns.md` - イベントパターン
-- `skills/scenario-analyzer/references/sector_sensitivity_matrix.md` - セクター感応度
-- `skills/scenario-analyzer/references/scenario_playbooks.md` - シナリオテンプレート
-
-## 重要な指示
-
-- **言語**: 全ての分析・出力は**日本語**で行う
-- **対象市場**: 銘柄選定は**米国市場上場銘柄のみ**
-- **時間軸**: シナリオは**18ヶ月**を対象
-- **確率**: Base + Bull + Bear = **100%**
-- **セカンドオピニオン**: **必須**で実行（常にstrategy-reviewerを呼び出す）
-
-## 出力
-
-最終的に `ヘッドライン・シナリオ分析レポート` を生成し、以下を含める：
-- 関連ニュース記事
-- 想定シナリオ概要（18ヶ月後まで）
-- セクター・業種への影響（1次/2次/3次）
-- ポジティブ影響銘柄（3-5銘柄）
-- ネガティブ影響銘柄（3-5銘柄）
-- セカンドオピニオン・レビュー
-- 最終投資判断・示唆
+Finally, generate a `Headline Scenario Analysis Report`, including:
+- Related News Articles
+- Outline of Assumed Scenario (Up to 18 Months Later)
+- Impact on Sectors and Industries (Primary/Secondary/Third-Round)
+- Stocks with Positive Impact (3-5 Stocks)
+- Stocks with Negative Impact (3-5 Stocks)
+- Second Opinion Review
+- Final Investment Decision and Implications
