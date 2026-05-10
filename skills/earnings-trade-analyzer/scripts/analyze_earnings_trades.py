@@ -92,6 +92,27 @@ def analyze_stock(daily_prices, earnings_date, timing):
     }
 
 
+def extract_earnings_prices(daily_prices, earnings_date):
+    """Extract OHLC for the day before, earnings day, and day after earnings.
+
+    daily_prices is most-recent-first. Returns a dict with keys:
+      d_minus_1, d0, d_plus_1 — each with open/close (None if unavailable).
+    """
+    idx = next((i for i, b in enumerate(daily_prices) if b.get("date") == earnings_date), -1)
+
+    def bar(i):
+        if 0 <= i < len(daily_prices):
+            b = daily_prices[i]
+            return {"open": b.get("open"), "close": b.get("close"), "date": b.get("date")}
+        return {"open": None, "close": None, "date": None}
+
+    return {
+        "d_minus_1": bar(idx + 1) if idx != -1 else bar(-1),  # day before
+        "d0": bar(idx) if idx != -1 else bar(-1),              # earnings day
+        "d_plus_1": bar(idx - 1) if idx != -1 else bar(-1),   # day after
+    }
+
+
 def apply_entry_filter(results):
     """Apply entry quality filter to exclude poor setups.
 
@@ -304,12 +325,14 @@ def main():
             continue
 
         current_price = daily_prices[0]["close"] if daily_prices else candidate["price"]  # type: ignore[index]
+        earnings_prices = extract_earnings_prices(daily_prices, candidate["earnings_date"])
 
         result = {
             "symbol": symbol,
             "company_name": candidate["company_name"],
             "earnings_date": candidate["earnings_date"],
             "earnings_timing": candidate["earnings_timing"],
+            "earnings_prices": earnings_prices,
             "gap_pct": gap_pct,
             "composite_score": composite["composite_score"],
             "grade": composite["grade"],

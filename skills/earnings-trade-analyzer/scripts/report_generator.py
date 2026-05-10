@@ -170,10 +170,10 @@ def generate_markdown_report(
     lines.append("## Top Results")
     lines.append("")
     lines.append(
-        "| Rank | Symbol | Company | Sector | Grade | Score | Gap% | Trend% | Vol Ratio | MA200 | MA50 | Mkt Cap |"
+        "| Rank | Symbol | Company | Sector | Date | Timing | D-1 O / C | D0 O / C | D+1 O / C | Grade | Score | Gap% | Trend% | Vol Ratio | MA200 | MA50 | Mkt Cap |"
     )
     lines.append(
-        "|------|--------|---------|--------|-------|-------|------|--------|-----------|-------|------|---------|"
+        "|------|--------|---------|--------|------|--------|-----------|----------|-----------|-------|-------|------|--------|-----------|-------|------|---------|"
     )
 
     for i, r in enumerate(results, 1):
@@ -184,6 +184,8 @@ def generate_markdown_report(
         score = r.get("composite_score", 0)
         gap_pct = r.get("gap_pct", 0)
         components = r.get("components", {})
+        earnings_date = r.get("earnings_date", "N/A")
+        timing = r.get("earnings_timing", "unknown").upper()
 
         trend_pct = components.get("pre_earnings_trend", {}).get("return_20d_pct", 0)
         vol_ratio = components.get("volume_trend", {}).get("vol_ratio_20_60", 0)
@@ -191,9 +193,17 @@ def generate_markdown_report(
         ma50_dist = components.get("ma50_position", {}).get("distance_pct", 0)
         market_cap = r.get("market_cap", 0)
 
+        ep = r.get("earnings_prices", {})
+
+        def _px(day):
+            o = ep.get(day, {}).get("open")
+            c = ep.get(day, {}).get("close")
+            return f"{o:.2f} / {c:.2f}" if o is not None and c is not None else "N/A"
+
         lines.append(
-            f"| {i} | **{symbol}** | {company} | {sector} | {grade} | {score:.1f} | "
-            f"{gap_pct:+.1f}% | {trend_pct:+.1f}% | {vol_ratio:.2f}x | "
+            f"| {i} | **{symbol}** | {company} | {sector} | {earnings_date} | {timing} | "
+            f"{_px('d_minus_1')} | {_px('d0')} | {_px('d_plus_1')} | "
+            f"{grade} | {score:.1f} | {gap_pct:+.1f}% | {trend_pct:+.1f}% | {vol_ratio:.2f}x | "
             f"{ma200_dist:+.1f}% | {ma50_dist:+.1f}% | {_format_market_cap(market_cap)} |"
         )
 
