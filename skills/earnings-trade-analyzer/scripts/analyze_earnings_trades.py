@@ -127,8 +127,8 @@ def main():
     parser.add_argument(
         "--min-market-cap",
         type=float,
-        default=500_000_000,
-        help="Minimum market cap in dollars (default: 500000000)",
+        default=5_000_000_000,
+        help="Minimum market cap in dollars (default: 5000000000)",
     )
     parser.add_argument("--min-gap", type=float, default=0, help="Minimum gap %% (default: 0)")
     parser.add_argument(
