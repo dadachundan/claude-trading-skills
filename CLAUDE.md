@@ -227,7 +227,7 @@ pre-commit install && pre-commit install --hook-type pre-push
 | **Dividend Growth Pullback Screener** | ✅ Required | 🟡 Optional (Recommended) | ❌ Not used | FMP for analysis; FINVIZ for RSI pre-screening |
 | **Pair Trade Screener** | ✅ Required | ❌ Not used | ❌ Not used | Statistical arbitrage analysis |
 | **Earnings Trade Analyzer** | ✅ Required | ❌ Not used | ❌ Not used | 5-factor earnings scoring; free tier sufficient |
-| **PEAD Screener** | ✅ Required | ❌ Not used | ❌ Not used | Weekly candle PEAD analysis; free tier sufficient |
+| **PEAD Screener** | ❌ Not used | ❌ Not used | ❌ Not used | Mode A: Finnhub (free, 60/min) for earnings calendar + Yahoo Finance (no key) for prices/profiles. Mode B: no API key required |
 | **IBD Distribution Day Monitor** | ✅ Required | ❌ Not used | ❌ Not used | Daily QQQ/SPY OHLCV; free tier sufficient (2 symbols × 1 call/day) |
 | **Options Strategy Advisor** | 🟡 Optional | ❌ Not used | ❌ Not used | FMP for stock data; Black-Scholes works without |
 | **Portfolio Manager** | ❌ Not used | ❌ Not used | ✅ Required | Real-time holdings via Alpaca MCP Server |
@@ -400,14 +400,16 @@ python3 skills/earnings-trade-analyzer/scripts/analyze_earnings_trades.py \
   --apply-entry-filter --output-dir reports/
 ```
 
-**PEAD Screener:** ⚠️ Requires FMP API key
+**PEAD Screener:** Mode A requires `FINNHUB_API_KEY` (free tier). Mode B needs no API key. All price/profile data via Yahoo Finance (`yfinance`, no key).
 ```bash
-# Mode A: FMP earnings calendar (standalone)
+# Mode A: Finnhub earnings calendar (standalone)
+export FINNHUB_API_KEY=your-key
 python3 skills/pead-screener/scripts/screen_pead.py \
-  --lookback-days 14 --min-gap 3.0 --max-api-calls 200 \
+  --lookback-days 14 --min-gap 3.0 \
+  --max-earnings-results 500 --max-candidates 200 \
   --output-dir reports/
 
-# Mode B: Pipeline from earnings-trade-analyzer output
+# Mode B: Pipeline from earnings-trade-analyzer output (no API key needed)
 python3 skills/pead-screener/scripts/screen_pead.py \
   --candidates-json reports/earnings_trade_*.json \
   --min-grade B --output-dir reports/
