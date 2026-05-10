@@ -14,12 +14,11 @@ EDGAR approach:
   Tickers are extracted from the filing's display_names field.
 """
 
-import contextlib
-import io
+import logging
 import re
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
 
@@ -31,6 +30,7 @@ except ImportError:
 
 try:
     import yfinance as yf
+    logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 except ImportError:
     print("ERROR: yfinance not installed. Run: pip install yfinance", file=sys.stderr)
     sys.exit(1)
@@ -195,8 +195,8 @@ class YahooFinanceClient:
 
         def _fast_one(symbol: str) -> tuple[str, dict | None]:
             try:
-                with contextlib.redirect_stderr(io.StringIO()):
-                    fi = yf.Ticker(symbol).fast_info
+                time.sleep(0.3)
+                fi = yf.Ticker(symbol).fast_info
                 exchange = getattr(fi, "exchange", "") or ""
                 return symbol, {
                     "mktCap": getattr(fi, "market_cap", 0) or 0,
@@ -205,7 +205,9 @@ class YahooFinanceClient:
                     "price": getattr(fi, "last_price", 0) or 0,
                 }
             except Exception as e:
-                print(f"  WARNING: fast_info failed for {symbol}: {e}", file=sys.stderr)
+                msg = str(e)
+                if "Too Many Requests" in msg or "Rate limited" in msg:
+                    print(f"  WARNING: rate limited on {symbol}, skipping", file=sys.stderr)
                 return symbol, None
 
         with ThreadPoolExecutor(max_workers=self.PROFILE_WORKERS) as ex:
@@ -230,8 +232,8 @@ class YahooFinanceClient:
 
         def _full_one(symbol: str) -> tuple[str, dict | None]:
             try:
-                with contextlib.redirect_stderr(io.StringIO()):
-                    info = yf.Ticker(symbol).info
+                time.sleep(0.3)
+                info = yf.Ticker(symbol).info
                 if not info:
                     return symbol, None
                 return symbol, {
@@ -344,8 +346,7 @@ class YahooFinanceClient:
                 self._rate_limit()
                 ticker = yf.Ticker(symbol)
                 fetch_days = int(days * 1.5) + 30
-                with contextlib.redirect_stderr(io.StringIO()):
-                    hist = ticker.history(period=f"{fetch_days}d", auto_adjust=True)
+                hist = ticker.history(period=f"{fetch_days}d", auto_adjust=True)
                 self._api_calls += 1
                 break
             except Exception as e:
