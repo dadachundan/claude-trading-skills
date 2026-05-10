@@ -156,6 +156,12 @@ def parse_arguments():
         help="Cap earnings entries before profile fetching (Mode A, default: 500, 0 = unlimited)",
     )
     parser.add_argument(
+        "--min-revenue",
+        type=float,
+        default=1_000_000_000,
+        help="Minimum revenue (estimate or actual) in dollars (Mode A, default: 1000000000, 0 = no filter)",
+    )
+    parser.add_argument(
         "--min-gap",
         type=float,
         default=3.0,
@@ -639,6 +645,21 @@ def _get_candidates_mode_a(finnhub: FinnhubClient, yahoo: YahooFinanceClient, ar
         return []
 
     print(f"  Raw earnings events: {len(earnings)}")
+
+    # Pre-filter by Finnhub revenue (estimate or actual) to drop micro-caps
+    # before the expensive Yahoo profile lookup.
+    if args.min_revenue and args.min_revenue > 0:
+        before = len(earnings)
+        earnings = [
+            e
+            for e in earnings
+            if max(e.get("revenueEstimate") or 0, e.get("revenueActual") or 0)
+            >= args.min_revenue
+        ]
+        print(
+            f"  Revenue filter (>=${args.min_revenue / 1e9:.1f}B): "
+            f"{before} -> {len(earnings)} symbols"
+        )
 
     # Cap before profile fetching (Yahoo fast_info is ~0.3s/symbol)
     if (
