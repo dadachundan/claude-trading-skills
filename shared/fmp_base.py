@@ -302,11 +302,7 @@ class FMPClient:
         return self.cache.get(cache_key)
 
     def get_institutional_holders(self, symbol: str) -> Optional[list[dict]]:
-        """13F institutional holder data.
-
-        Requires a paid FMP subscription — returns None on free tier (429).
-        Endpoint uses 'ticker' not 'symbol' as the query param.
-        """
+        """13F institutional holder data. Requires FMP Ultimate plan ($99/mo)."""
         cache_key = f"institutional_{symbol}"
         if cache_key in self.cache:
             return self.cache[cache_key]
@@ -315,6 +311,13 @@ class FMPClient:
         if isinstance(data, list) and data:
             self.cache[cache_key] = data
             return data
+        if not getattr(self, "_institutional_warned", False):
+            print(
+                "WARNING: 13F Institutional Holdings requires FMP Ultimate plan ($99/mo). "
+                "I-component will score 0.",
+                file=sys.stderr,
+            )
+            self._institutional_warned = True
         return None
 
     # ------------------------------------------------------------------
