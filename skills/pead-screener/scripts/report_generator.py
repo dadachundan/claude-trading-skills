@@ -71,7 +71,7 @@ def generate_markdown_report(
     lines.append("# PEAD Screener Report - Post-Earnings Announcement Drift")
     lines.append(f"**Generated:** {metadata.get('generated_at', 'N/A')}")
     mode = metadata.get("mode", "A")
-    mode_desc = "FMP Earnings Calendar" if mode == "A" else "Earnings Trade Analyzer JSON"
+    mode_desc = "Finnhub Earnings Calendar" if mode == "A" else "Earnings Trade Analyzer JSON"
     lines.append(f"**Mode:** {mode} ({mode_desc})")
     lines.append(f"**Lookback:** {metadata.get('lookback_days', 'N/A')} days")
     lines.append(f"**Watch Window:** {metadata.get('watch_weeks', 'N/A')} weeks")

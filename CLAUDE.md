@@ -148,16 +148,21 @@ Skills are tested by invoking them in Claude Code conversations:
 
 ### Pushing Changes
 
-After confirming tests pass, always push directly to main and update local main to match:
+**Work in a worktree is not finished until it's pushed to `main` and the main checkout is synced.** Do not stop after editing files — committing only on the worktree branch leaves the user running stale code at `/Users/x/projects/claude-trading-skills/`. Always finish the loop:
 
 ```bash
+# From inside the worktree (current branch is e.g. claude/pedantic-ptolemy-d98d94)
 git add <files>
 git commit -m "descriptive message"
-git push origin main
+
+# Push the worktree branch's commits to origin/main
+git push origin HEAD:main
+
+# Sync the main checkout so the user runs the latest code
 git -C /Users/x/projects/claude-trading-skills pull --ff-only origin main
 ```
 
-Do not open a PR for routine fixes — push to main directly once tests are green.
+Do not open a PR for routine fixes — push to main directly once tests are green. If the push is rejected (non-fast-forward), rebase the worktree branch onto `origin/main` first; do not force-push.
 
 ### Code Generation (TDD)
 

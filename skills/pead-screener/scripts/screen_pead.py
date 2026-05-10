@@ -6,12 +6,16 @@ Screens post-earnings gap-up stocks for Post-Earnings Announcement Drift (PEAD)
 patterns using weekly candle analysis.
 
 Two input modes:
-  Mode A: FMP earnings calendar -> profile batch -> gap filter -> weekly analysis
+  Mode A: Finnhub earnings calendar -> Yahoo profile filter -> gap filter -> weekly analysis
   Mode B: earnings-trade-analyzer JSON output -> grade filter -> weekly analysis
 
+Data sources (no FMP):
+  - Earnings calendar: Finnhub (free tier, 60 calls/min)
+  - Company profiles + historical prices: Yahoo Finance via yfinance (free, no key)
+
 Usage:
-    # Mode A: FMP earnings calendar (default)
-    python3 screen_pead.py --api-key YOUR_KEY --output-dir reports/
+    # Mode A: Finnhub earnings calendar (default)
+    python3 screen_pead.py --api-key YOUR_FINNHUB_KEY --output-dir reports/
 
     # Mode B: From earnings-trade-analyzer JSON
     python3 screen_pead.py --candidates-json reports/earnings_analysis.json --output-dir reports/
@@ -36,9 +40,10 @@ from calculators.breakout_calculator import calculate_breakout
 from calculators.liquidity_calculator import calculate_liquidity
 from calculators.risk_reward_calculator import calculate_risk_reward
 from calculators.weekly_candle_calculator import analyze_weekly_pattern, daily_to_weekly
-from fmp_client import ApiCallBudgetExceeded, FMPClient
+from finnhub_client import FinnhubClient
 from report_generator import generate_json_report, generate_markdown_report
 from scorer import calculate_composite_score
+from yahoo_finance_client import YahooFinanceClient
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +95,18 @@ def calculate_price_gap(daily_prices: list[dict], earnings_date: str, timing: st
     return round(((gap_price / base_price) - 1.0) * 100.0, 2)
 
 
+def normalize_timing(time_value: str) -> str:
+    """Normalize Finnhub hour field to bmo/amc/unknown."""
+    if not time_value:
+        return "unknown"
+    t = time_value.lower().strip()
+    if t == "bmo":
+        return "bmo"
+    if t == "amc":
+        return "amc"
+    return "unknown"
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="PEAD Stock Screener - Post-Earnings Announcement Drift"
@@ -97,19 +114,15 @@ def parse_arguments():
 
     # Common arguments
     parser.add_argument(
-        "--api-key", help="FMP API key (defaults to FMP_API_KEY environment variable)"
+        "--api-key",
+        help="Finnhub API key (defaults to FINNHUB_API_KEY environment variable). "
+             "Required for Mode A (earnings calendar fetch).",
     )
     parser.add_argument(
         "--watch-weeks",
         type=int,
         default=5,
         help="Monitoring period in weeks after earnings (default: 5)",
-    )
-    parser.add_argument(
-        "--max-api-calls",
-        type=int,
-        default=200,
-        help="API call budget (default: 200)",
     )
     parser.add_argument(
         "--top",
@@ -122,6 +135,12 @@ def parse_arguments():
         default="reports/",
         help="Output directory for reports (default: reports/)",
     )
+    parser.add_argument(
+        "--max-candidates",
+        type=int,
+        default=200,
+        help="Cap candidates after profile filter, sorted by market cap (default: 200, 0 = unlimited)",
+    )
 
     # Mode A arguments
     parser.add_argument(
@@ -129,6 +148,12 @@ def parse_arguments():
         type=int,
         default=14,
         help="Days back for earnings calendar (Mode A, default: 14)",
+    )
+    parser.add_argument(
+        "--max-earnings-results",
+        type=int,
+        default=500,
+        help="Cap earnings entries before profile fetching (Mode A, default: 500, 0 = unlimited)",
     )
     parser.add_argument(
         "--min-gap",
@@ -394,20 +419,29 @@ def main():
     print("=" * 70)
     print("PEAD Stock Screener")
     print("Post-Earnings Announcement Drift")
+    print("Data source: Finnhub (calendar) + Yahoo Finance (profiles/prices)")
     print("=" * 70)
     print()
 
     # Determine mode
     mode = "B" if args.candidates_json else "A"
-    print(f"Mode: {mode} ({'JSON Input' if mode == 'B' else 'FMP Earnings Calendar'})")
+    print(f"Mode: {mode} ({'JSON Input' if mode == 'B' else 'Finnhub Earnings Calendar'})")
 
-    # Initialize FMP client (needed for both modes for historical data)
-    try:
-        client = FMPClient(api_key=args.api_key, max_api_calls=args.max_api_calls)
-        print("FMP API client initialized")
-    except ValueError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
+    yahoo = YahooFinanceClient()
+    finnhub = None
+
+    # Mode A requires Finnhub for earnings calendar
+    if mode == "A":
+        api_key = args.api_key or os.environ.get("FINNHUB_API_KEY")
+        if not api_key:
+            print(
+                "ERROR: Finnhub API key required for Mode A. "
+                "Set FINNHUB_API_KEY env var or pass --api-key.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        finnhub = FinnhubClient(api_key)
+        print("Finnhub client initialized")
 
     # ========================================================================
     # Phase 1: Get Candidates
@@ -419,7 +453,7 @@ def main():
     candidates = []
 
     if mode == "A":
-        candidates = _get_candidates_mode_a(client, args)
+        candidates = _get_candidates_mode_a(finnhub, yahoo, args)
     else:
         candidates = _get_candidates_mode_b(args)
 
@@ -428,32 +462,18 @@ def main():
         sys.exit(0)
 
     print(f"  Total candidates: {len(candidates)}")
-    print()
 
-    # ========================================================================
-    # Phase 1.5: Budget Check
-    # ========================================================================
-    print("Phase 1.5: Budget Check")
-    print("-" * 70)
-
-    api_stats = client.get_api_stats()
-    remaining = api_stats["budget_remaining"]
-    needed = len(candidates)  # 1 historical call per candidate
-    print(f"  API calls remaining: {remaining}")
-    print(f"  Estimated calls needed: {needed} (1 per candidate)")
-
-    if needed > remaining:
-        # Trim candidates to fit budget
-        candidates = candidates[:remaining]
-        print(f"  WARNING: Trimmed to {len(candidates)} candidates to fit API budget")
-    else:
-        print("  Budget sufficient")
+    # Optionally cap candidates (sort by market cap descending if available)
+    if args.max_candidates and args.max_candidates > 0 and len(candidates) > args.max_candidates:
+        candidates.sort(key=lambda c: c.get("market_cap", 0) or 0, reverse=True)
+        candidates = candidates[: args.max_candidates]
+        print(f"  Capped to {len(candidates)} candidates by market cap.")
     print()
 
     # ========================================================================
     # Phase 2: Fetch Historical Data & Weekly Candle Analysis
     # ========================================================================
-    print("Phase 2: Fetch Historical Data")
+    print("Phase 2: Fetch Historical Data (Yahoo Finance)")
     print("-" * 70)
 
     results = []
@@ -462,12 +482,7 @@ def main():
         if (i + 1) % 10 == 0 or i == len(candidates) - 1:
             print(f"  Progress: {i + 1}/{len(candidates)}", flush=True)
 
-        try:
-            data = client.get_historical_prices(symbol, days=90)
-        except ApiCallBudgetExceeded:
-            print(f"  WARNING: API budget exceeded at {symbol}. Processing collected data.")
-            break
-
+        data = yahoo.get_historical_prices(symbol, days=120)
         if not data or "historical" not in data:
             continue
 
@@ -525,7 +540,14 @@ def main():
     json_file = os.path.join(args.output_dir, f"pead_screener_{timestamp}.json")
     md_file = os.path.join(args.output_dir, f"pead_screener_{timestamp}.md")
 
-    api_stats = client.get_api_stats()
+    finnhub_stats = finnhub.get_api_stats() if finnhub else {"api_calls_made": 0}
+    yahoo_stats = yahoo.get_api_stats()
+    api_stats = {
+        "finnhub": finnhub_stats,
+        "yahoo_finance": yahoo_stats,
+        "api_calls_made": finnhub_stats.get("api_calls_made", 0) + yahoo_stats.get("api_calls_made", 0),
+        "cache_entries": finnhub_stats.get("cache_entries", 0) + yahoo_stats.get("cache_entries", 0),
+    }
 
     metadata = {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -536,6 +558,11 @@ def main():
         "min_gap": args.min_gap if mode == "A" else None,
         "min_market_cap": args.min_market_cap if mode == "A" else None,
         "min_grade": args.min_grade if mode == "B" else None,
+        "data_sources": {
+            "earnings_calendar": "finnhub" if mode == "A" else "earnings-trade-analyzer-json",
+            "profiles": "yahoo_finance" if mode == "A" else None,
+            "historical_prices": "yahoo_finance",
+        },
         "api_stats": api_stats,
     }
 
@@ -593,55 +620,61 @@ def main():
     print(f"  Markdown Report: {md_file}")
     print()
     print("API Usage:")
-    print(f"  API calls made: {api_stats['api_calls_made']}")
-    print(f"  Budget remaining: {api_stats['budget_remaining']}")
+    print(f"  Finnhub calls:        {finnhub_stats.get('api_calls_made', 0)}")
+    print(f"  Yahoo Finance calls:  {yahoo_stats.get('api_calls_made', 0)}")
     print()
 
 
-def _get_candidates_mode_a(client: FMPClient, args) -> list[dict]:
-    """Get candidates from FMP earnings calendar (Mode A)."""
+def _get_candidates_mode_a(finnhub: FinnhubClient, yahoo: YahooFinanceClient, args) -> list[dict]:
+    """Get candidates from Finnhub earnings calendar + Yahoo profile filter (Mode A)."""
     # Calculate date range
     to_date = datetime.now().strftime("%Y-%m-%d")
     from_date = (datetime.now() - timedelta(days=args.lookback_days)).strftime("%Y-%m-%d")
 
-    print(f"  Fetching earnings calendar: {from_date} to {to_date}")
+    print(f"  Fetching Finnhub earnings calendar: {from_date} to {to_date}")
 
-    earnings = client.get_earnings_calendar(from_date, to_date)
+    earnings = finnhub.get_earnings_calendar(from_date, to_date)
     if not earnings:
         print("  WARNING: No earnings data returned")
         return []
 
     print(f"  Raw earnings events: {len(earnings)}")
 
-    # Get unique symbols
-    symbols = list(set(e.get("symbol", "") for e in earnings if e.get("symbol")))
-    if not symbols:
-        return []
+    # Cap before profile fetching (Yahoo fast_info is ~0.3s/symbol)
+    if (
+        args.max_earnings_results
+        and args.max_earnings_results > 0
+        and len(earnings) > args.max_earnings_results
+    ):
+        earnings = earnings[: args.max_earnings_results]
+        print(f"  Capped to {len(earnings)} earnings entries (--max-earnings-results)")
 
-    # Fetch company profiles for market cap filtering
-    print(f"  Fetching profiles for {len(symbols)} symbols...")
-    profiles = client.get_company_profiles(symbols)
+    # Fetch Yahoo Finance company profiles for market cap + US exchange filter
+    print(f"  Fetching Yahoo Finance profiles for {len(earnings)} symbols...")
+    profiles = yahoo.get_company_profiles_batch(earnings)
+    print(f"  Profiles retrieved: {len(profiles)}")
 
-    # Build candidates with market cap filter (gap filter deferred to Phase 2
-    # where actual price data is available for accurate gap calculation)
-    grade_map = {e.get("symbol"): e for e in earnings}
     candidates = []
+    seen = set()
+    for earning in earnings:
+        symbol = earning.get("symbol", "")
+        if not symbol or symbol in seen:
+            continue
 
-    for symbol in symbols:
-        earning = grade_map.get(symbol, {})
-        profile = profiles.get(symbol, {})
+        profile = profiles.get(symbol)
+        if not profile:
+            continue
 
-        # Market cap filter
         market_cap = profile.get("mktCap", 0) or 0
         if market_cap < args.min_market_cap:
             continue
 
-        timing = earning.get("time", "")
-        # Normalize timing
-        if timing in ("bmo", "Before Market Open"):
-            timing = "bmo"
-        elif timing in ("amc", "After Market Close"):
-            timing = "amc"
+        # US exchange filter (Yahoo profile country='US' indicates a US-listed primary)
+        if profile.get("country", "") != "US":
+            continue
+
+        seen.add(symbol)
+        timing = normalize_timing(earning.get("time", ""))
 
         candidates.append(
             {
@@ -653,7 +686,7 @@ def _get_candidates_mode_a(client: FMPClient, args) -> list[dict]:
             }
         )
 
-    print(f"  Candidates after market cap filter: {len(candidates)}")
+    print(f"  Candidates after market cap + US filter: {len(candidates)}")
     return candidates
 
 

@@ -1,6 +1,6 @@
 ---
 name: pead-screener
-description: Screen post-earnings gap-up stocks for PEAD (Post-Earnings Announcement Drift) patterns. Analyzes weekly candle formation to detect red candle pullbacks and breakout signals. Supports two input modes - FMP earnings calendar (Mode A) or earnings-trade-analyzer JSON output (Mode B). Use when user asks about PEAD screening, post-earnings drift, earnings gap follow-through, red candle breakout patterns, or weekly earnings momentum setups.
+description: Screen post-earnings gap-up stocks for PEAD (Post-Earnings Announcement Drift) patterns. Analyzes weekly candle formation to detect red candle pullbacks and breakout signals. Supports two input modes - Finnhub earnings calendar (Mode A) or earnings-trade-analyzer JSON output (Mode B). Use when user asks about PEAD screening, post-earnings drift, earnings gap follow-through, red candle breakout patterns, or weekly earnings momentum setups.
 ---
 
 # PEAD Screener - Post-Earnings Announcement Drift
@@ -17,12 +17,17 @@ Screen post-earnings gap-up stocks for PEAD (Post-Earnings Announcement Drift) p
 
 ## Prerequisites
 
-- FMP API key (set `FMP_API_KEY` environment variable or pass `--api-key`)
+Data sources:
+- **Earnings calendar**: Finnhub (Mode A only) — free tier, 60 calls/min
+- **Company profiles + historical prices**: Yahoo Finance via `yfinance` — free, no key
+
+Setup:
+- Mode A requires a Finnhub API key:
   ```bash
-  export FMP_API_KEY=your_api_key_here
+  export FINNHUB_API_KEY=your_api_key_here
   ```
-- Free tier (250 calls/day) is sufficient for default screening
-- For Mode B: earnings-trade-analyzer JSON output file with schema_version "1.0"
+- Mode B requires no API key (only Yahoo Finance for prices, which is keyless).
+- Mode B input: earnings-trade-analyzer JSON output with `schema_version: "1.0"`.
 
 ## Workflow
 
@@ -30,7 +35,7 @@ Screen post-earnings gap-up stocks for PEAD (Post-Earnings Announcement Drift) p
 
 Run the PEAD screener script in one of two modes:
 
-**Mode A (FMP earnings calendar):**
+**Mode A (Finnhub earnings calendar):**
 ```bash
 # Default: last 14 days of earnings, 5-week monitoring window
 python3 skills/pead-screener/scripts/screen_pead.py --output-dir reports/
@@ -41,6 +46,7 @@ python3 skills/pead-screener/scripts/screen_pead.py \
   --watch-weeks 6 \
   --min-gap 5.0 \
   --min-market-cap 1000000000 \
+  --max-earnings-results 500 \
   --output-dir reports/
 ```
 
