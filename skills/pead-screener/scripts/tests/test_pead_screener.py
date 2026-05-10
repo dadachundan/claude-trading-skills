@@ -980,7 +980,7 @@ class TestCalculatePriceGap:
 
 
 class TestFMPClient:
-    @patch("fmp_base.requests.Session")
+    @patch("fmp_client.requests.Session")
     def test_api_429(self, mock_session_class):
         """Mock 429 -> rate_limit_reached, returns None."""
         mock_session = MagicMock()
@@ -998,7 +998,7 @@ class TestFMPClient:
         assert result is None
         assert client.rate_limit_reached is True
 
-    @patch("fmp_base.requests.Session")
+    @patch("fmp_client.requests.Session")
     def test_api_timeout(self, mock_session_class):
         """Mock Timeout -> returns None."""
         import requests as req
@@ -1041,7 +1041,7 @@ class TestFMPHistoricalNormalizer:
         client.max_retries = 0
         return client
 
-    @patch("fmp_base.requests.Session")
+    @patch("fmp_client.requests.Session")
     def test_eod_flat_list_truncated_to_days(self, mock_session_class):
         """Contract: returned historical is truncated to `days` rows.
 
@@ -1078,7 +1078,7 @@ class TestFMPHistoricalNormalizer:
         assert result["historical"][0]["date"] == "2026-04-30"
         assert result["historical"][1]["date"] == "2026-04-29"
 
-    @patch("fmp_base.requests.Session")
+    @patch("fmp_client.requests.Session")
     def test_eod_flat_list_normalized(self, mock_session_class):
         """New stable EOD flat list -> v3-compat dict with historical[]."""
         mock_session = MagicMock()
@@ -1118,7 +1118,7 @@ class TestFMPHistoricalNormalizer:
             "row-level symbol should be stripped to mirror v3 shape"
         )
 
-    @patch("fmp_base.requests.Session")
+    @patch("fmp_client.requests.Session")
     def test_empty_list_falls_back_via_falsy_path(self, mock_session_class):
         """Empty list response is caught by `if not data: continue` before normalizer."""
         mock_session = MagicMock()
@@ -1130,7 +1130,7 @@ class TestFMPHistoricalNormalizer:
         # Both stable and v3 fallback see empty/None -> final result None
         assert result is None
 
-    @patch("fmp_base.requests.Session")
+    @patch("fmp_client.requests.Session")
     def test_eod_symbol_mismatch_rejected(self, mock_session_class):
         """List with no matching symbol -> normalizer returns None, fallback exhausted."""
         mock_session = MagicMock()
@@ -1144,7 +1144,7 @@ class TestFMPHistoricalNormalizer:
         result = client.get_historical_prices("SPY", days=2)
         assert result is None
 
-    @patch("fmp_base.requests.Session")
+    @patch("fmp_client.requests.Session")
     def test_eod_row_without_symbol_field(self, mock_session_class):
         """Single-symbol endpoint may omit per-row 'symbol' -> treat as requested symbol."""
         mock_session = MagicMock()
@@ -1164,7 +1164,7 @@ class TestFMPHistoricalNormalizer:
         assert len(result["historical"]) == 2
         assert result["historical"][0]["close"] == 501.0
 
-    @patch("fmp_base.requests.Session")
+    @patch("fmp_client.requests.Session")
     def test_eod_index_symbol_normalized(self, mock_session_class):
         """Dot/dash normalization (BRK.B vs BRK-B style) works."""
         mock_session = MagicMock()
@@ -1179,7 +1179,7 @@ class TestFMPHistoricalNormalizer:
         assert result is not None
         assert result["historical"][0]["close"] == 401.0
 
-    @patch("fmp_base.requests.Session")
+    @patch("fmp_client.requests.Session")
     def test_url_uses_eod_endpoint(self, mock_session_class):
         """Regression: stable URL must be /historical-price-eod/full, not /historical-price-full."""
         mock_session = MagicMock()

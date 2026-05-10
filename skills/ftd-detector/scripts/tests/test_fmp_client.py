@@ -166,7 +166,7 @@ class TestCallerRegression:
 class TestEODFlatListSuccess:
     """Issue #64: stable EOD flat list -> public method success (regression)."""
 
-    @patch("fmp_base.requests.Session")
+    @patch("fmp_client.requests.Session")
     def test_get_historical_prices_normalizes_flat_list(self, mock_session_class):
         """Flat list response from new EOD endpoint -> dict contract preserved."""
         mock_session = MagicMock()

@@ -60,6 +60,13 @@ repos:
         files: 'skills/.*/SKILL\.md$|docs/.*/skills/.*\.md$'
         pass_filenames: false
 
+      - id: fmp-client-sync
+        name: Check skill fmp_client.py files are synced
+        entry: python3 scripts/hooks/check_fmp_sync.py
+        language: system
+        files: 'shared/fmp_base\.py|skills/.*/scripts/fmp_client\.py$'
+        pass_filenames: false
+
       # Pre-push hook: run all skill-level tests before pushing
       # Tests run per-skill to avoid module name collisions (scorer.py, helpers.py, etc.)
       - id: pytest-pre-push
