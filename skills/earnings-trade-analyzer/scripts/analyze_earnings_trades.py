@@ -39,6 +39,7 @@ from calculators.ma200_calculator import calculate_ma200_position
 from calculators.pre_earnings_trend_calculator import calculate_pre_earnings_trend
 from calculators.volume_trend_calculator import calculate_volume_trend
 from finnhub_client import FinnhubClient
+from yahoo_finance_client import YahooFinanceClient
 from report_generator import generate_json_report, generate_markdown_report
 from scorer import calculate_composite_score
 
@@ -131,10 +132,10 @@ def main():
     )
     parser.add_argument("--min-gap", type=float, default=0, help="Minimum gap %% (default: 0)")
     parser.add_argument(
-        "--max-edgar-results",
+        "--max-earnings-results",
         type=int,
         default=500,
-        help="Cap EDGAR filings before profile fetching (default: 500, 0 = unlimited)",
+        help="Cap earnings entries before profile fetching (default: 500, 0 = unlimited)",
     )
     parser.add_argument(
         "--max-candidates",
@@ -170,11 +171,12 @@ def main():
         )
         sys.exit(1)
 
-    client = FinnhubClient(api_key)
+    finnhub = FinnhubClient(api_key)
+    yahoo = YahooFinanceClient()
 
     print("=" * 60, file=sys.stderr)
     print("Earnings Trade Analyzer - 5-Factor Scoring", file=sys.stderr)
-    print("Data source: Finnhub API", file=sys.stderr)
+    print("Data source: Finnhub (calendar/profiles) + Yahoo Finance (prices)", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
 
     # Phase 1: Fetch earnings calendar and profiles
@@ -186,7 +188,7 @@ def main():
 
     print(f"Date range: {from_date} to {to_date}", file=sys.stderr)
 
-    earnings = client.get_earnings_calendar(from_date, to_date)
+    earnings = finnhub.get_earnings_calendar(from_date, to_date)
 
     if not earnings:
         print("ERROR: No earnings data returned.", file=sys.stderr)
@@ -194,14 +196,14 @@ def main():
 
     print(f"Raw earnings announcements: {len(earnings)}", file=sys.stderr)
 
-    # Cap EDGAR results before expensive profile fetching to avoid rate limits
-    if args.max_edgar_results and args.max_edgar_results > 0 and len(earnings) > args.max_edgar_results:
-        earnings = earnings[: args.max_edgar_results]
-        print(f"Capped to {len(earnings)} EDGAR results (use --max-edgar-results 0 for unlimited).", file=sys.stderr)
+    # Cap before expensive profile fetching to avoid rate limits
+    if args.max_earnings_results and args.max_earnings_results > 0 and len(earnings) > args.max_earnings_results:
+        earnings = earnings[: args.max_earnings_results]
+        print(f"Capped to {len(earnings)} earnings entries (use --max-earnings-results 0 for unlimited).", file=sys.stderr)
 
     # Extract profiles from screener data (no extra API calls needed)
     print("Extracting company profiles...", file=sys.stderr)
-    profiles = client.get_company_profiles_from_quotes(earnings)
+    profiles = finnhub.get_company_profiles_from_quotes(earnings)
     print(f"Profiles retrieved: {len(profiles)}", file=sys.stderr)
 
     # Filter by market cap and US exchange
@@ -262,7 +264,7 @@ def main():
             end="",
         )
 
-        price_data = client.get_historical_prices(symbol, days=250)
+        price_data = yahoo.get_historical_prices(symbol, days=250)
         daily_prices = price_data.get("historical") if price_data else None
 
         if not daily_prices or len(daily_prices) < 50:
@@ -339,7 +341,7 @@ def main():
     # Phase 4: Generate reports
     print("\n--- Phase 4: Generate Reports ---", file=sys.stderr)
 
-    api_stats = client.get_api_stats()
+    api_stats = finnhub.get_api_stats()
     metadata = {
         "generated_at": datetime.now().isoformat(),
         "generator": "earnings-trade-analyzer",
