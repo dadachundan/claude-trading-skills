@@ -134,8 +134,8 @@ def main():
     parser.add_argument(
         "--min-revenue",
         type=float,
-        default=1_000_000_000,
-        help="Minimum revenue estimate in dollars (default: 1000000000, 0 = no filter)",
+        default=5_000_000_000,
+        help="Minimum revenue estimate in dollars (default: 5000000000, 0 = no filter)",
     )
     parser.add_argument(
         "--max-earnings-results",
