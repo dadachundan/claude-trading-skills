@@ -44,7 +44,7 @@ class YahooFinanceClient:
 
     RATE_LIMIT_DELAY = 0.3  # seconds between requests
 
-    PROFILE_WORKERS = 20  # parallel threads for profile fetching
+    PROFILE_WORKERS = 5  # parallel threads for profile fetching
 
     # SEC EDGAR EFTS full-text search
     EDGAR_EFTS_URL = "https://efts.sec.gov/LATEST/search-index"
@@ -332,14 +332,28 @@ class YahooFinanceClient:
         if cache_key in self.cache:
             return self.cache[cache_key]
 
-        try:
-            self._rate_limit()
-            ticker = yf.Ticker(symbol)
-            # Request extra calendar days to get enough trading days after weekends/holidays
-            fetch_days = int(days * 1.5) + 30
-            hist = ticker.history(period=f"{fetch_days}d", auto_adjust=True)
-            self._api_calls += 1
+        for attempt in range(3):
+            try:
+                self._rate_limit()
+                ticker = yf.Ticker(symbol)
+                fetch_days = int(days * 1.5) + 30
+                with contextlib.redirect_stderr(io.StringIO()):
+                    hist = ticker.history(period=f"{fetch_days}d", auto_adjust=True)
+                self._api_calls += 1
+                break
+            except Exception as e:
+                if "Too Many Requests" in str(e) or "Rate limited" in str(e):
+                    wait = 5 * (2 ** attempt)
+                    print(f"  Rate limited, retrying {symbol} in {wait}s...", file=sys.stderr)
+                    time.sleep(wait)
+                    continue
+                print(f"WARNING: Failed to fetch prices for {symbol}: {e}", file=sys.stderr)
+                return None
+        else:
+            print(f"WARNING: Failed to fetch prices for {symbol} after 3 attempts", file=sys.stderr)
+            return None
 
+        try:
             if hist.empty:
                 return None
 
