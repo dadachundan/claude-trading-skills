@@ -302,12 +302,16 @@ class FMPClient:
         return self.cache.get(cache_key)
 
     def get_institutional_holders(self, symbol: str) -> Optional[list[dict]]:
-        """13F institutional holder data."""
+        """13F institutional holder data.
+
+        Requires a paid FMP subscription — returns None on free tier (429).
+        Endpoint uses 'ticker' not 'symbol' as the query param.
+        """
         cache_key = f"institutional_{symbol}"
         if cache_key in self.cache:
             return self.cache[cache_key]
         url = f"{self.STABLE_URL}/institutional-ownership/institutional-holders-by-company"
-        data = self._rate_limited_get(url, {"symbol": symbol}, quiet=True)
+        data = self._rate_limited_get(url, {"ticker": symbol}, quiet=True)
         if isinstance(data, list) and data:
             self.cache[cache_key] = data
             return data

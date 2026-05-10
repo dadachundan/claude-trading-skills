@@ -16,16 +16,25 @@ import requests
 
 BASE = "https://financialmodelingprep.com"
 
+# (url, params) pairs — vary both path and param name
 CANDIDATES = [
-    f"{BASE}/stable/institutional-ownership/institutional-holders-by-company",
-    f"{BASE}/stable/institutional-holder",
-    f"{BASE}/stable/institutional-ownership",
+    # stable — symbol as query param
+    (f"{BASE}/stable/institutional-ownership/institutional-holders-by-company", {"symbol": None}),
+    (f"{BASE}/stable/institutional-holder",                                     {"symbol": None}),
+    (f"{BASE}/stable/institutional-ownership",                                  {"symbol": None}),
+    (f"{BASE}/stable/institutional-ownership/symbol-ownership",                 {"symbol": None}),
+    (f"{BASE}/stable/institutional-ownership/portfolio-holdings-summary",       {"symbol": None}),
+    (f"{BASE}/stable/ownership/institutional-holders",                          {"symbol": None}),
+    (f"{BASE}/stable/institutional-ownership/list",                             {"symbol": None}),
+    # stable — ticker as query param (some endpoints use "ticker" not "symbol")
+    (f"{BASE}/stable/institutional-ownership/institutional-holders-by-company", {"ticker": None}),
+    (f"{BASE}/stable/institutional-holder",                                     {"ticker": None}),
 ]
 
 
-def probe(url: str, symbol: str, api_key: str) -> tuple[int, object]:
+def probe(url: str, params: dict, api_key: str) -> tuple[int, object]:
     try:
-        r = requests.get(url, params={"symbol": symbol}, headers={"apikey": api_key}, timeout=10)
+        r = requests.get(url, params=params, headers={"apikey": api_key}, timeout=10)
         try:
             body = r.json()
         except Exception:
@@ -45,26 +54,38 @@ def check_institutional_endpoint(symbol: str = "AAPL") -> str | None:
     print(f"Probing institutional-holder stable endpoints for {symbol}...\n")
 
     working_url = None
-    for url in CANDIDATES:
-        status, body = probe(url, symbol, api_key)
+    seen = set()
+    for url, param_template in CANDIDATES:
+        params = {k: symbol for k, v in param_template.items()}
+        key = (url, tuple(sorted(params.keys())))
+        if key in seen:
+            continue
+        seen.add(key)
+        param_str = "&".join(f"{k}={v}" for k, v in params.items())
+        status, body = probe(url, params, api_key)
         if status == 200 and isinstance(body, list) and body:
-            print(f"✅  {status}  {url}")
+            print(f"✅  {status}  {url}?{param_str}")
             print(f"     {len(body)} records  —  sample keys: {list(body[0].keys())[:6]}")
             if working_url is None:
-                working_url = url
+                working_url = (url, list(params.keys())[0])
         elif status == 200:
-            print(f"⚠️   {status}  {url}  (empty or wrong shape: {type(body).__name__})")
+            print(f"⚠️   {status}  {url}?{param_str}  (shape: {type(body).__name__}, body: {str(body)[:80]})")
+        elif status == 404:
+            print(f"❌  {status}  {url}?{param_str}  (path not found)")
+        elif status == 429:
+            print(f"⚠️   {status}  {url}?{param_str}  (endpoint exists — subscription upgrade required)")
         else:
-            snippet = str(body)[:120] if body else ""
-            print(f"❌  {status}  {url}  {snippet}")
+            snippet = str(body)[:100] if body else ""
+            print(f"❌  {status}  {url}?{param_str}  {snippet}")
 
     print()
     if working_url:
-        print(f"Working URL: {working_url}")
+        url, param_key = working_url
+        print(f"Working URL: {url}?{param_key}={{symbol}}")
         print(f"\nUpdate shared/fmp_base.py get_institutional_holders() to use this path.")
     else:
         print("No working endpoint found — institutional data unavailable on this subscription.")
-    return working_url
+    return working_url[0] if working_url else None
 
 
 if __name__ == "__main__":
