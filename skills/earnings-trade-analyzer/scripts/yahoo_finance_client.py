@@ -210,25 +210,23 @@ class YahooFinanceClient:
                     print(f"  WARNING: rate limited on {symbol}, skipping", file=sys.stderr)
                 return symbol, None
 
+        total1 = len(uncached)
         with ThreadPoolExecutor(max_workers=self.PROFILE_WORKERS) as ex:
-            for symbol, data in ex.map(_fast_one, uncached):
+            for i, (symbol, data) in enumerate(ex.map(_fast_one, uncached), 1):
                 if data:
                     fast_profiles[symbol] = data
-
-        print(f"  Phase 1 complete: {len(fast_profiles)}/{len(uncached)} symbols returned data", file=sys.stderr)
+                if i % 10 == 0 or i == total1:
+                    print(f"  Phase 1: [{i}/{total1}] fast_info fetched", file=sys.stderr)
 
         us_count = sum(1 for p in fast_profiles.values() if p["country"] == "US")
         large_cap_count = sum(1 for p in fast_profiles.values() if p["country"] == "US" and p["mktCap"] >= 1_000_000_000)
-        print(f"  US exchange: {us_count}, US $1B+: {large_cap_count}", file=sys.stderr)
+        print(f"  Phase 1 complete: {len(fast_profiles)}/{total1} returned data — US: {us_count}, US $5B+: {large_cap_count}", file=sys.stderr)
 
         # Phase 2: full info for US candidates above $1B to get name/sector
         enrich_targets = [
             s for s, p in fast_profiles.items()
             if p["country"] == "US" and p["mktCap"] >= 1_000_000_000
         ]
-
-        if enrich_targets:
-            print(f"Fetching {len(enrich_targets)} profiles (phase 2: full info)...", file=sys.stderr)
 
         def _full_one(symbol: str) -> tuple[str, dict | None]:
             try:
@@ -246,9 +244,12 @@ class YahooFinanceClient:
 
         enriched: dict[str, dict] = {}
         with ThreadPoolExecutor(max_workers=self.PROFILE_WORKERS) as ex:
-            for symbol, data in ex.map(_full_one, enrich_targets):
+            total2 = len(enrich_targets)
+            for i, (symbol, data) in enumerate(ex.map(_full_one, enrich_targets), 1):
                 if data:
                     enriched[symbol] = data
+                if i % 10 == 0 or i == total2:
+                    print(f"  Phase 2: [{i}/{total2}] full info fetched", file=sys.stderr)
 
         # Merge phases into final profiles
         for symbol, fast in fast_profiles.items():
