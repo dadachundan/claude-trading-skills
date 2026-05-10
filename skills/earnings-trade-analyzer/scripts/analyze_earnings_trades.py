@@ -201,9 +201,8 @@ def main():
         earnings = earnings[: args.max_earnings_results]
         print(f"Capped to {len(earnings)} earnings entries (use --max-earnings-results 0 for unlimited).", file=sys.stderr)
 
-    # Extract profiles from screener data (no extra API calls needed)
-    print("Extracting company profiles...", file=sys.stderr)
-    profiles = finnhub.get_company_profiles_from_quotes(earnings)
+    print("Fetching company profiles (Yahoo Finance batch)...", file=sys.stderr)
+    profiles = yahoo.get_company_profiles_batch(earnings)
     print(f"Profiles retrieved: {len(profiles)}", file=sys.stderr)
 
     # Filter by market cap and US exchange

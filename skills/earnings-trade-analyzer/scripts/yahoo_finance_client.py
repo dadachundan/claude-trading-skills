@@ -41,6 +41,9 @@ class YahooFinanceClient:
 
     RATE_LIMIT_DELAY = 0.3  # seconds between requests
 
+    YAHOO_QUOTE_URL = "https://query1.finance.yahoo.com/v7/finance/quote"
+    YAHOO_QUOTE_BATCH_SIZE = 100
+
     # SEC EDGAR EFTS full-text search
     EDGAR_EFTS_URL = "https://efts.sec.gov/LATEST/search-index"
     EDGAR_USER_AGENT = "EarningsTradeAnalyzer/2.0 contact@example.com"
@@ -160,8 +163,76 @@ class YahooFinanceClient:
         return m.group(1) if m else None
 
     # ------------------------------------------------------------------
-    # Company profiles via yfinance
+    # Company profiles via Yahoo Finance batch quote API
     # ------------------------------------------------------------------
+
+    def get_company_profiles_batch(self, earnings_entries: list[dict]) -> dict[str, dict]:
+        """Batch-fetch company profiles using Yahoo Finance /v7/finance/quote.
+
+        Fetches up to 100 symbols per HTTP request — much faster than
+        per-symbol Ticker.info calls. Returns the same profile dict shape
+        as get_company_profiles_from_quotes so callers are interchangeable.
+
+        Profile dict keys: companyName, mktCap, country, exchangeShortName,
+                           sector, industry, price.
+        country is set to "US" when exchange is in US_EXCHANGES.
+        """
+        symbols = [e.get("symbol", "") for e in earnings_entries if e.get("symbol")]
+        results: dict[str, dict] = {}
+        uncached: list[str] = []
+
+        for s in symbols:
+            key = f"profile_{s}"
+            if key in self.cache:
+                results[s] = self.cache[key]
+            else:
+                uncached.append(s)
+
+        total_batches = (len(uncached) + self.YAHOO_QUOTE_BATCH_SIZE - 1) // self.YAHOO_QUOTE_BATCH_SIZE
+        if uncached:
+            print(f"Fetching {len(uncached)} profiles in {total_batches} batch(es)...", file=sys.stderr)
+
+        for i in range(0, len(uncached), self.YAHOO_QUOTE_BATCH_SIZE):
+            batch = uncached[i : i + self.YAHOO_QUOTE_BATCH_SIZE]
+            batch_profiles = self._fetch_quote_batch(batch)
+            for symbol, profile in batch_profiles.items():
+                self.cache[f"profile_{symbol}"] = profile
+                results[symbol] = profile
+
+        return results
+
+    def _fetch_quote_batch(self, symbols: list[str]) -> dict[str, dict]:
+        """Single /v7/finance/quote request for a batch of symbols."""
+        try:
+            resp = requests.get(
+                self.YAHOO_QUOTE_URL,
+                params={"symbols": ",".join(symbols)},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            print(f"WARNING: Yahoo Finance batch quote failed: {e}", file=sys.stderr)
+            return {}
+
+        profiles: dict[str, dict] = {}
+        for quote in data.get("quoteResponse", {}).get("result", []):
+            symbol = quote.get("symbol", "")
+            if not symbol:
+                continue
+            exchange = quote.get("exchange", "")
+            country = "US" if exchange in self.US_EXCHANGES else ""
+            profiles[symbol] = {
+                "companyName": quote.get("longName") or quote.get("shortName") or symbol,
+                "mktCap": quote.get("marketCap") or 0,
+                "country": country,
+                "exchangeShortName": exchange,
+                "sector": quote.get("sector") or "N/A",
+                "industry": quote.get("industry") or "N/A",
+                "price": quote.get("regularMarketPrice") or 0,
+            }
+        return profiles
 
     def get_company_profiles_from_quotes(
         self, earnings_entries: list[dict]
