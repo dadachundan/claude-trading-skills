@@ -193,77 +193,76 @@ class TestGetCompanyProfiles:
 
 
 # ---------------------------------------------------------------------------
-# get_historical_prices
+# get_historical_prices  (backed by yfinance)
 # ---------------------------------------------------------------------------
 
 
 class TestGetHistoricalPrices:
-    def _candle_response(self, n=5):
-        """Build a minimal Finnhub candle response with n bars, oldest-first."""
-        import time as _time
+    def _make_hist_df(self, n=5):
+        """Build a minimal yfinance-style DataFrame with n bars, oldest-first."""
+        import pandas as pd
 
-        base_ts = int(_time.time()) - n * 86400
-        return {
-            "s": "ok",
-            "t": [base_ts + i * 86400 for i in range(n)],
-            "o": [100.0 + i * 0.5 for i in range(n)],
-            "h": [101.0 + i * 0.5 for i in range(n)],
-            "l": [99.0 + i * 0.5 for i in range(n)],
-            "c": [100.5 + i * 0.5 for i in range(n)],
-            "v": [1_000_000 + i * 10_000 for i in range(n)],
-        }
+        dates = pd.date_range("2025-01-01", periods=n, freq="B")
+        return pd.DataFrame(
+            {
+                "Open":   [100.0 + i * 0.5 for i in range(n)],
+                "High":   [101.0 + i * 0.5 for i in range(n)],
+                "Low":    [99.0  + i * 0.5 for i in range(n)],
+                "Close":  [100.5 + i * 0.5 for i in range(n)],
+                "Volume": [1_000_000 + i * 10_000 for i in range(n)],
+            },
+            index=dates,
+        )
 
-    def test_returns_dict_contract(self):
+    @patch("finnhub_client.yf.Ticker")
+    def test_returns_dict_contract(self, mock_ticker_cls):
+        mock_ticker_cls.return_value.history.return_value = self._make_hist_df()
         client = _make_client()
-        _mock_get(client, self._candle_response())
         result = client.get_historical_prices("AAPL", days=5)
         assert result is not None
-        assert "symbol" in result
-        assert "historical" in result
         assert result["symbol"] == "AAPL"
+        assert "historical" in result
 
-    def test_most_recent_first(self):
-        """Finnhub returns oldest-first; client must reverse to most-recent-first."""
-        client = _make_client()
-        _mock_get(client, self._candle_response(n=3))
-        rows = client.get_historical_prices("AAPL", days=3)["historical"]
-        # First row should have the highest close (most recent bar)
+    @patch("finnhub_client.yf.Ticker")
+    def test_most_recent_first(self, mock_ticker_cls):
+        """yfinance returns oldest-first; client must reverse to most-recent-first."""
+        mock_ticker_cls.return_value.history.return_value = self._make_hist_df(n=3)
+        rows = _make_client().get_historical_prices("AAPL", days=3)["historical"]
         assert rows[0]["close"] > rows[-1]["close"]
 
-    def test_row_keys_present(self):
-        client = _make_client()
-        _mock_get(client, self._candle_response(n=1))
-        row = client.get_historical_prices("AAPL", days=1)["historical"][0]
+    @patch("finnhub_client.yf.Ticker")
+    def test_row_keys_present(self, mock_ticker_cls):
+        mock_ticker_cls.return_value.history.return_value = self._make_hist_df(n=1)
+        row = _make_client().get_historical_prices("AAPL", days=1)["historical"][0]
         for key in ("date", "open", "high", "low", "close", "volume"):
             assert key in row
 
-    def test_days_limit_respected(self):
-        client = _make_client()
-        _mock_get(client, self._candle_response(n=10))
-        rows = client.get_historical_prices("AAPL", days=5)["historical"]
+    @patch("finnhub_client.yf.Ticker")
+    def test_days_limit_respected(self, mock_ticker_cls):
+        mock_ticker_cls.return_value.history.return_value = self._make_hist_df(n=10)
+        rows = _make_client().get_historical_prices("AAPL", days=5)["historical"]
         assert len(rows) == 5
 
-    def test_no_data_returns_none(self):
-        client = _make_client()
-        _mock_get(client, {"s": "no_data"})
-        assert client.get_historical_prices("FAKE", days=250) is None
+    @patch("finnhub_client.yf.Ticker")
+    def test_empty_df_returns_none(self, mock_ticker_cls):
+        import pandas as pd
+        mock_ticker_cls.return_value.history.return_value = pd.DataFrame()
+        assert _make_client().get_historical_prices("FAKE", days=250) is None
 
-    def test_empty_arrays_returns_none(self):
-        client = _make_client()
-        _mock_get(client, {"s": "ok", "c": [], "t": [], "o": [], "h": [], "l": [], "v": []})
-        assert client.get_historical_prices("FAKE", days=250) is None
+    @patch("finnhub_client.yf.Ticker")
+    def test_exception_returns_none(self, mock_ticker_cls):
+        mock_ticker_cls.return_value.history.side_effect = Exception("connection error")
+        assert _make_client().get_historical_prices("ERR", days=250) is None
 
-    def test_api_failure_returns_none(self):
+    @patch("finnhub_client.yf.Ticker")
+    def test_caches_result(self, mock_ticker_cls):
+        mock_ticker = MagicMock()
+        mock_ticker_cls.return_value = mock_ticker
+        mock_ticker.history.return_value = self._make_hist_df()
         client = _make_client()
-        client._get = MagicMock(side_effect=Exception("connection error"))
-        assert client.get_historical_prices("ERR", days=250) is None
-
-    def test_caches_result(self):
-        client = _make_client()
-        mock = _mock_get(client, self._candle_response())
         client.get_historical_prices("SPY", days=5)
         client.get_historical_prices("SPY", days=5)
-        assert mock.call_count == 1
+        assert mock_ticker.history.call_count == 1
 
 
 # ---------------------------------------------------------------------------

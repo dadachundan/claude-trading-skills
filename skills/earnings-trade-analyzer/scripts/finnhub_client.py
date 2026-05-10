@@ -2,12 +2,12 @@
 """
 Finnhub client for Earnings Trade Analyzer.
 
-Data sources (all via Finnhub API, free tier: 60 calls/minute):
-  - Earnings calendar: /calendar/earnings  — returns BMO/AMC/DMH timing
-  - Company profiles:  /stock/profile2     — market cap (millions), country, industry
-  - Historical OHLCV:  /stock/candle       — daily bars, resolution "D"
+Data sources:
+  - Earnings calendar: Finnhub /calendar/earnings  (free) — real BMO/AMC timing
+  - Company profiles:  Finnhub /stock/profile2      (free) — market cap, country
+  - Historical OHLCV:  yfinance Ticker.history()    (free) — /stock/candle is paid
 
-Rate limiting: 1.1-second gap between calls keeps usage under the free-tier limit.
+Rate limiting: 1.1-second gap between Finnhub calls (60 calls/min free tier).
 
 Interface contract: method signatures and return schemas are identical to
 YahooFinanceClient so analyze_earnings_trades.py works with either client.
@@ -15,13 +15,19 @@ YahooFinanceClient so analyze_earnings_trades.py works with either client.
 
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 try:
     import requests
 except ImportError:
     print("ERROR: requests not installed. Run: pip install requests", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    import yfinance as yf
+except ImportError:
+    print("ERROR: yfinance not installed. Run: pip install yfinance", file=sys.stderr)
     sys.exit(1)
 
 
@@ -162,11 +168,11 @@ class FinnhubClient:
         return results
 
     # ------------------------------------------------------------------
-    # Historical OHLCV
+    # Historical OHLCV  (yfinance — Finnhub /stock/candle requires paid plan)
     # ------------------------------------------------------------------
 
     def get_historical_prices(self, symbol: str, days: int = 250) -> Optional[dict]:
-        """Fetch daily OHLCV from Finnhub /stock/candle (resolution D).
+        """Fetch daily OHLCV via yfinance (free, no API key needed).
 
         Returns {"symbol": ..., "historical": [...]} with most-recent-first
         rows — identical contract to YahooFinanceClient.get_historical_prices().
@@ -176,57 +182,43 @@ class FinnhubClient:
         if cache_key in self.cache:
             return self.cache[cache_key]
 
-        # Request 2× the trading days + buffer to ensure enough calendar days
-        to_ts = int(datetime.now().timestamp())
-        from_ts = int((datetime.now() - timedelta(days=days * 2 + 100)).timestamp())
-
         try:
-            data = self._get(
-                "/stock/candle",
-                {"symbol": symbol, "resolution": "D", "from": from_ts, "to": to_ts},
-            )
+            ticker = yf.Ticker(symbol)
+            fetch_days = int(days * 1.5) + 30
+            hist = ticker.history(period=f"{fetch_days}d", auto_adjust=True)
+            self._api_calls += 1
+
+            if hist.empty:
+                return None
+
+            rows = []
+            for dt_idx, row in hist.iterrows():
+                rows.append(
+                    {
+                        "date": dt_idx.strftime("%Y-%m-%d"),
+                        "open": round(float(row["Open"]), 4),
+                        "high": round(float(row["High"]), 4),
+                        "low": round(float(row["Low"]), 4),
+                        "close": round(float(row["Close"]), 4),
+                        "volume": int(row["Volume"]),
+                    }
+                )
+
+            # yfinance returns oldest-first; reverse to most-recent-first
+            rows.reverse()
+            if days and days > 0:
+                rows = rows[:days]
+
+            if not rows:
+                return None
+
+            result = {"symbol": symbol, "historical": rows}
+            self.cache[cache_key] = result
+            return result
+
         except Exception as e:
-            print(f"WARNING: Finnhub candle fetch failed for {symbol}: {e}", file=sys.stderr)
+            print(f"WARNING: Failed to fetch prices for {symbol}: {e}", file=sys.stderr)
             return None
-
-        if data.get("s") != "ok":
-            return None
-
-        closes = data.get("c", [])
-        highs = data.get("h", [])
-        lows = data.get("l", [])
-        opens = data.get("o", [])
-        timestamps = data.get("t", [])
-        volumes = data.get("v", [])
-
-        if not closes or len(closes) != len(timestamps):
-            return None
-
-        rows = []
-        for i in range(len(closes)):
-            dt = datetime.fromtimestamp(timestamps[i])
-            rows.append(
-                {
-                    "date": dt.strftime("%Y-%m-%d"),
-                    "open": round(float(opens[i]), 4),
-                    "high": round(float(highs[i]), 4),
-                    "low": round(float(lows[i]), 4),
-                    "close": round(float(closes[i]), 4),
-                    "volume": int(volumes[i]),
-                }
-            )
-
-        # Finnhub returns oldest-first; reverse to match expected contract
-        rows.reverse()
-        if days and days > 0:
-            rows = rows[:days]
-
-        if not rows:
-            return None
-
-        result = {"symbol": symbol, "historical": rows}
-        self.cache[cache_key] = result
-        return result
 
     # ------------------------------------------------------------------
     # Utilities
