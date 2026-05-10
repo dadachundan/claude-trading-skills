@@ -14,6 +14,8 @@ EDGAR approach:
   Tickers are extracted from the filing's display_names field.
 """
 
+import contextlib
+import io
 import re
 import sys
 import time
@@ -193,7 +195,8 @@ class YahooFinanceClient:
 
         def _fast_one(symbol: str) -> tuple[str, dict | None]:
             try:
-                fi = yf.Ticker(symbol).fast_info
+                with contextlib.redirect_stderr(io.StringIO()):
+                    fi = yf.Ticker(symbol).fast_info
                 exchange = getattr(fi, "exchange", "") or ""
                 return symbol, {
                     "mktCap": getattr(fi, "market_cap", 0) or 0,
@@ -220,7 +223,8 @@ class YahooFinanceClient:
 
         def _full_one(symbol: str) -> tuple[str, dict | None]:
             try:
-                info = yf.Ticker(symbol).info
+                with contextlib.redirect_stderr(io.StringIO()):
+                    info = yf.Ticker(symbol).info
                 if not info:
                     return symbol, None
                 return symbol, {
