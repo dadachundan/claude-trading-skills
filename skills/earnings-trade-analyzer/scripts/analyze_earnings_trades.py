@@ -132,6 +132,12 @@ def main():
     )
     parser.add_argument("--min-gap", type=float, default=0, help="Minimum gap %% (default: 0)")
     parser.add_argument(
+        "--min-revenue",
+        type=float,
+        default=1_000_000_000,
+        help="Minimum revenue estimate in dollars (default: 1000000000, 0 = no filter)",
+    )
+    parser.add_argument(
         "--max-earnings-results",
         type=int,
         default=500,
@@ -200,6 +206,12 @@ def main():
     if args.max_earnings_results and args.max_earnings_results > 0 and len(earnings) > args.max_earnings_results:
         earnings = earnings[: args.max_earnings_results]
         print(f"Capped to {len(earnings)} earnings entries (use --max-earnings-results 0 for unlimited).", file=sys.stderr)
+
+    # Pre-filter by revenue estimate to reduce profile API calls
+    if args.min_revenue and args.min_revenue > 0:
+        before = len(earnings)
+        earnings = [e for e in earnings if e.get("revenueEstimate", 0) >= args.min_revenue]
+        print(f"Revenue filter (>=${args.min_revenue/1e9:.1f}B): {before} → {len(earnings)} symbols", file=sys.stderr)
 
     print("Fetching company profiles (Yahoo Finance batch)...", file=sys.stderr)
     profiles = yahoo.get_company_profiles_batch(earnings)
