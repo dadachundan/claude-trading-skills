@@ -17,6 +17,7 @@ EDGAR approach:
 import re
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Optional
 
@@ -41,8 +42,7 @@ class YahooFinanceClient:
 
     RATE_LIMIT_DELAY = 0.3  # seconds between requests
 
-    YAHOO_QUOTE_URL = "https://query1.finance.yahoo.com/v7/finance/quote"
-    YAHOO_QUOTE_BATCH_SIZE = 100
+    PROFILE_WORKERS = 20  # parallel threads for profile fetching
 
     # SEC EDGAR EFTS full-text search
     EDGAR_EFTS_URL = "https://efts.sec.gov/LATEST/search-index"
@@ -167,72 +167,92 @@ class YahooFinanceClient:
     # ------------------------------------------------------------------
 
     def get_company_profiles_batch(self, earnings_entries: list[dict]) -> dict[str, dict]:
-        """Batch-fetch company profiles using Yahoo Finance /v7/finance/quote.
+        """Fetch company profiles using yfinance with parallel threads.
 
-        Fetches up to 100 symbols per HTTP request — much faster than
-        per-symbol Ticker.info calls. Returns the same profile dict shape
-        as get_company_profiles_from_quotes so callers are interchangeable.
+        Phase 1: fast_info (lightweight) for all symbols in parallel →
+                 market cap + exchange for filtering. No auth issues.
+        Phase 2: full Ticker.info for symbols that pass a broad pre-filter
+                 ($1B+ market cap, US exchange) → company name + sector.
 
         Profile dict keys: companyName, mktCap, country, exchangeShortName,
                            sector, industry, price.
-        country is set to "US" when exchange is in US_EXCHANGES.
         """
         symbols = [e.get("symbol", "") for e in earnings_entries if e.get("symbol")]
         results: dict[str, dict] = {}
-        uncached: list[str] = []
+        uncached = [s for s in symbols if f"profile_{s}" not in self.cache]
 
         for s in symbols:
-            key = f"profile_{s}"
-            if key in self.cache:
-                results[s] = self.cache[key]
-            else:
-                uncached.append(s)
+            if f"profile_{s}" in self.cache:
+                results[s] = self.cache[f"profile_{s}"]
 
-        total_batches = (len(uncached) + self.YAHOO_QUOTE_BATCH_SIZE - 1) // self.YAHOO_QUOTE_BATCH_SIZE
         if uncached:
-            print(f"Fetching {len(uncached)} profiles in {total_batches} batch(es)...", file=sys.stderr)
+            print(f"Fetching {len(uncached)} profiles (phase 1: fast_info)...", file=sys.stderr)
 
-        for i in range(0, len(uncached), self.YAHOO_QUOTE_BATCH_SIZE):
-            batch = uncached[i : i + self.YAHOO_QUOTE_BATCH_SIZE]
-            batch_profiles = self._fetch_quote_batch(batch)
-            for symbol, profile in batch_profiles.items():
-                self.cache[f"profile_{symbol}"] = profile
-                results[symbol] = profile
+        # Phase 1: fast_info — market cap + exchange, no auth required
+        fast_profiles: dict[str, dict] = {}
+
+        def _fast_one(symbol: str) -> tuple[str, dict | None]:
+            try:
+                fi = yf.Ticker(symbol).fast_info
+                exchange = getattr(fi, "exchange", "") or ""
+                return symbol, {
+                    "mktCap": getattr(fi, "market_cap", 0) or 0,
+                    "country": "US" if exchange in self.US_EXCHANGES else "",
+                    "exchangeShortName": exchange,
+                    "price": getattr(fi, "last_price", 0) or 0,
+                }
+            except Exception:
+                return symbol, None
+
+        with ThreadPoolExecutor(max_workers=self.PROFILE_WORKERS) as ex:
+            for symbol, data in ex.map(_fast_one, uncached):
+                if data:
+                    fast_profiles[symbol] = data
+
+        # Phase 2: full info for US candidates above $1B to get name/sector
+        enrich_targets = [
+            s for s, p in fast_profiles.items()
+            if p["country"] == "US" and p["mktCap"] >= 1_000_000_000
+        ]
+
+        if enrich_targets:
+            print(f"Fetching {len(enrich_targets)} profiles (phase 2: full info)...", file=sys.stderr)
+
+        def _full_one(symbol: str) -> tuple[str, dict | None]:
+            try:
+                info = yf.Ticker(symbol).info
+                if not info:
+                    return symbol, None
+                return symbol, {
+                    "companyName": info.get("longName") or info.get("shortName") or symbol,
+                    "sector": info.get("sector") or "N/A",
+                    "industry": info.get("industry") or "N/A",
+                }
+            except Exception:
+                return symbol, None
+
+        enriched: dict[str, dict] = {}
+        with ThreadPoolExecutor(max_workers=self.PROFILE_WORKERS) as ex:
+            for symbol, data in ex.map(_full_one, enrich_targets):
+                if data:
+                    enriched[symbol] = data
+
+        # Merge phases into final profiles
+        for symbol, fast in fast_profiles.items():
+            extra = enriched.get(symbol, {})
+            profile = {
+                "companyName": extra.get("companyName", symbol),
+                "mktCap": fast["mktCap"],
+                "country": fast["country"],
+                "exchangeShortName": fast["exchangeShortName"],
+                "sector": extra.get("sector", "N/A"),
+                "industry": extra.get("industry", "N/A"),
+                "price": fast["price"],
+            }
+            self.cache[f"profile_{symbol}"] = profile
+            results[symbol] = profile
 
         return results
-
-    def _fetch_quote_batch(self, symbols: list[str]) -> dict[str, dict]:
-        """Single /v7/finance/quote request for a batch of symbols."""
-        try:
-            resp = requests.get(
-                self.YAHOO_QUOTE_URL,
-                params={"symbols": ",".join(symbols)},
-                headers={"User-Agent": "Mozilla/5.0"},
-                timeout=30,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-        except Exception as e:
-            print(f"WARNING: Yahoo Finance batch quote failed: {e}", file=sys.stderr)
-            return {}
-
-        profiles: dict[str, dict] = {}
-        for quote in data.get("quoteResponse", {}).get("result", []):
-            symbol = quote.get("symbol", "")
-            if not symbol:
-                continue
-            exchange = quote.get("exchange", "")
-            country = "US" if exchange in self.US_EXCHANGES else ""
-            profiles[symbol] = {
-                "companyName": quote.get("longName") or quote.get("shortName") or symbol,
-                "mktCap": quote.get("marketCap") or 0,
-                "country": country,
-                "exchangeShortName": exchange,
-                "sector": quote.get("sector") or "N/A",
-                "industry": quote.get("industry") or "N/A",
-                "price": quote.get("regularMarketPrice") or 0,
-            }
-        return profiles
 
     def get_company_profiles_from_quotes(
         self, earnings_entries: list[dict]
