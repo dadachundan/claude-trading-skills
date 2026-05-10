@@ -154,7 +154,7 @@ After confirming tests pass, always push directly to main and update local main 
 git add <files>
 git commit -m "descriptive message"
 git push origin main
-git fetch origin main && git branch -f main origin/main
+git -C /Users/x/projects/claude-trading-skills pull --ff-only origin main
 ```
 
 Do not open a PR for routine fixes — push to main directly once tests are green.
