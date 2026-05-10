@@ -194,21 +194,25 @@ class YahooFinanceClient:
         fast_profiles: dict[str, dict] = {}
 
         def _fast_one(symbol: str) -> tuple[str, dict | None]:
-            try:
-                time.sleep(0.3)
-                fi = yf.Ticker(symbol).fast_info
-                exchange = getattr(fi, "exchange", "") or ""
-                return symbol, {
-                    "mktCap": getattr(fi, "market_cap", 0) or 0,
-                    "country": "US" if exchange in self.US_EXCHANGES else "",
-                    "exchangeShortName": exchange,
-                    "price": getattr(fi, "last_price", 0) or 0,
-                }
-            except Exception as e:
-                msg = str(e)
-                if "Too Many Requests" in msg or "Rate limited" in msg:
-                    print(f"  WARNING: rate limited on {symbol}, skipping", file=sys.stderr)
-                return symbol, None
+            for attempt in range(3):
+                try:
+                    time.sleep(0.3)
+                    fi = yf.Ticker(symbol).fast_info
+                    exchange = getattr(fi, "exchange", "") or ""
+                    return symbol, {
+                        "mktCap": getattr(fi, "market_cap", 0) or 0,
+                        "country": "US" if exchange in self.US_EXCHANGES else "",
+                        "exchangeShortName": exchange,
+                        "price": getattr(fi, "last_price", 0) or 0,
+                    }
+                except Exception as e:
+                    if "Too Many Requests" in str(e) or "Rate limited" in str(e):
+                        wait = 5 * (2 ** attempt)
+                        print(f"  Rate limited, retrying {symbol} in {wait}s...", file=sys.stderr)
+                        time.sleep(wait)
+                        continue
+                    return symbol, None
+            return symbol, None
 
         total1 = len(uncached)
         with ThreadPoolExecutor(max_workers=self.PROFILE_WORKERS) as ex:
