@@ -31,6 +31,7 @@ Execute the analyzer script:
 
 ```bash
 # Default: last 2 days of earnings, top 20 results (no API key needed)
+# Limits: 500 EDGAR results → 200 scored candidates (by market cap)
 python3 skills/earnings-trade-analyzer/scripts/analyze_earnings_trades.py --output-dir reports/
 
 # Custom lookback and market cap filter
@@ -40,10 +41,15 @@ python3 skills/earnings-trade-analyzer/scripts/analyze_earnings_trades.py \
   --top 30 \
   --output-dir reports/
 
-# With entry quality filter and candidate cap
+# With entry quality filter and explicit candidate cap
 python3 skills/earnings-trade-analyzer/scripts/analyze_earnings_trades.py \
   --apply-entry-filter \
   --max-candidates 100 \
+  --output-dir reports/
+
+# Unlimited (for thorough scans — slower, may hit rate limits)
+python3 skills/earnings-trade-analyzer/scripts/analyze_earnings_trades.py \
+  --max-edgar-results 0 --max-candidates 0 \
   --output-dir reports/
 ```
 

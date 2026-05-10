@@ -131,10 +131,16 @@ def main():
     )
     parser.add_argument("--min-gap", type=float, default=0, help="Minimum gap %% (default: 0)")
     parser.add_argument(
+        "--max-edgar-results",
+        type=int,
+        default=500,
+        help="Cap EDGAR filings before profile fetching (default: 500, 0 = unlimited)",
+    )
+    parser.add_argument(
         "--max-candidates",
         type=int,
-        default=0,
-        help="Max candidates to score (0 = unlimited, default: 0)",
+        default=200,
+        help="Max candidates to score, sorted by market cap (default: 200, 0 = unlimited)",
     )
     parser.add_argument(
         "--apply-entry-filter",
@@ -174,6 +180,11 @@ def main():
         sys.exit(1)
 
     print(f"Raw earnings announcements: {len(earnings)}", file=sys.stderr)
+
+    # Cap EDGAR results before expensive profile fetching to avoid rate limits
+    if args.max_edgar_results and args.max_edgar_results > 0 and len(earnings) > args.max_edgar_results:
+        earnings = earnings[: args.max_edgar_results]
+        print(f"Capped to {len(earnings)} EDGAR results (use --max-edgar-results 0 for unlimited).", file=sys.stderr)
 
     # Extract profiles from screener data (no extra API calls needed)
     print("Extracting company profiles...", file=sys.stderr)
