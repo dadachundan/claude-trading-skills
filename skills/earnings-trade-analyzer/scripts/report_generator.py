@@ -170,14 +170,16 @@ def generate_markdown_report(
     lines.append("## Top Results")
     lines.append("")
     lines.append(
-        "| Rank | Symbol | Grade | Score | Gap% | Trend% | Vol Ratio | MA200 | MA50 | Mkt Cap |"
+        "| Rank | Symbol | Company | Sector | Grade | Score | Gap% | Trend% | Vol Ratio | MA200 | MA50 | Mkt Cap |"
     )
     lines.append(
-        "|------|--------|-------|-------|------|--------|-----------|-------|------|---------|"
+        "|------|--------|---------|--------|-------|-------|------|--------|-----------|-------|------|---------|"
     )
 
     for i, r in enumerate(results, 1):
         symbol = r.get("symbol", "???")
+        company = r.get("company_name", symbol)
+        sector = r.get("sector", "N/A")
         grade = r.get("grade", "D")
         score = r.get("composite_score", 0)
         gap_pct = r.get("gap_pct", 0)
@@ -190,7 +192,7 @@ def generate_markdown_report(
         market_cap = r.get("market_cap", 0)
 
         lines.append(
-            f"| {i} | **{symbol}** | {grade} | {score:.1f} | "
+            f"| {i} | **{symbol}** | {company} | {sector} | {grade} | {score:.1f} | "
             f"{gap_pct:+.1f}% | {trend_pct:+.1f}% | {vol_ratio:.2f}x | "
             f"{ma200_dist:+.1f}% | {ma50_dist:+.1f}% | {_format_market_cap(market_cap)} |"
         )
