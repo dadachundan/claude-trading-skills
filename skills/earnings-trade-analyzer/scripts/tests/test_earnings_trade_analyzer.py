@@ -9,7 +9,7 @@ scorer, report generator, and FMP client edge cases.
 import json
 import os
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch  # noqa: F401 (patch used in TestYahooFinanceClient)
 
 from analyze_earnings_trades import apply_entry_filter
 from calculators.gap_size_calculator import calculate_gap
@@ -17,9 +17,9 @@ from calculators.ma50_calculator import calculate_ma50_position
 from calculators.ma200_calculator import calculate_ma200_position
 from calculators.pre_earnings_trend_calculator import calculate_pre_earnings_trend
 from calculators.volume_trend_calculator import calculate_volume_trend
-from fmp_client import ApiCallBudgetExceeded, FMPClient
 from report_generator import generate_json_report, generate_markdown_report
 from scorer import COMPONENT_WEIGHTS, calculate_composite_score
+from yahoo_finance_client import YahooFinanceClient
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -833,74 +833,227 @@ class TestReportGenerator:
 
 
 # ===========================================================================
-# FMP Client Failure Cases
+# Yahoo Finance Client Tests
 # ===========================================================================
 
 
-class TestFMPClient:
-    """Test FMP client error handling and budget enforcement."""
+class TestYahooFinanceClient:
+    """Test YahooFinanceClient helpers and stats."""
 
-    @patch("fmp_client.requests.Session")
-    def test_api_429_retry(self, mock_session_cls):
-        """429 response triggers retry, sets rate_limit_reached on second failure."""
-        mock_session = MagicMock()
-        mock_session_cls.return_value = mock_session
+    def test_extract_ticker_standard(self):
+        """Extract ticker from standard EDGAR display_name format."""
+        name = "APPLE INC  (AAPL)  (CIK 0000320193)"
+        assert YahooFinanceClient._extract_ticker(name) == "AAPL"
 
-        # First call returns 429, second also 429 (exceeds max_retries=1)
-        mock_response_429 = MagicMock()
-        mock_response_429.status_code = 429
-        mock_response_429.text = "Rate limit exceeded"
-        mock_session.get.return_value = mock_response_429
+    def test_extract_ticker_short(self):
+        """Single-letter ticker extracts correctly."""
+        name = "SOME CORP  (F)  (CIK 0000037996)"
+        assert YahooFinanceClient._extract_ticker(name) == "F"
 
-        client = FMPClient(api_key="test_key", max_api_calls=200)
-        result = client._rate_limited_get("http://example.com/test")
+    def test_extract_ticker_missing(self):
+        """No parenthesised uppercase sequence -> None."""
+        assert YahooFinanceClient._extract_ticker("No ticker here") is None
 
-        assert result is None
-        assert client.rate_limit_reached is True
-
-    @patch("fmp_client.requests.Session")
-    def test_api_timeout(self, mock_session_cls):
-        """requests.Timeout returns None without crashing."""
-        import requests as req
-
-        mock_session = MagicMock()
-        mock_session_cls.return_value = mock_session
-        mock_session.get.side_effect = req.exceptions.Timeout("Connection timed out")
-
-        client = FMPClient(api_key="test_key", max_api_calls=200)
-        result = client._rate_limited_get("http://example.com/test")
-
+    def test_extract_ticker_skips_lowercase(self):
+        """Lowercase or mixed-case parenthetical is not a ticker."""
+        result = YahooFinanceClient._extract_ticker("Company (Inc.) details")
         assert result is None
 
-    def test_budget_exceeded(self):
-        """After max_api_calls, subsequent calls raise ApiCallBudgetExceeded."""
-        client = FMPClient(api_key="test_key", max_api_calls=5)
-        client.api_calls_made = 5  # Simulate 5 calls already made
-
-        try:
-            client._rate_limited_get("http://example.com/test")
-            raise AssertionError("Should have raised ApiCallBudgetExceeded")
-        except ApiCallBudgetExceeded:
-            pass  # Expected
-
-    def test_budget_exceeded_at_exact_limit(self):
-        """Budget is checked before making the call."""
-        client = FMPClient(api_key="test_key", max_api_calls=3)
-        client.api_calls_made = 3
-
-        try:
-            client._rate_limited_get("http://example.com/test")
-            raise AssertionError("Should have raised ApiCallBudgetExceeded")
-        except ApiCallBudgetExceeded:
-            pass
-
-    def test_api_stats(self):
-        """get_api_stats returns expected structure."""
-        client = FMPClient(api_key="test_key", max_api_calls=100)
+    def test_api_stats_structure(self):
+        """get_api_stats returns expected keys."""
+        client = YahooFinanceClient()
         stats = client.get_api_stats()
         assert "api_calls_made" in stats
-        assert "max_api_calls" in stats
-        assert stats["max_api_calls"] == 100
+        assert "cache_entries" in stats
+        assert "data_source" in stats
+        assert stats["data_source"] == "sec_edgar_yfinance"
+
+    def test_clear_cache(self):
+        """clear_cache empties the cache dict."""
+        client = YahooFinanceClient()
+        client.cache["foo"] = "bar"
+        client.clear_cache()
+        assert client.cache == {}
+
+    def test_us_exchanges_non_empty(self):
+        """US_EXCHANGES is a non-empty set."""
+        assert isinstance(YahooFinanceClient.US_EXCHANGES, set)
+        assert len(YahooFinanceClient.US_EXCHANGES) > 0
+        assert "NMS" in YahooFinanceClient.US_EXCHANGES  # NASDAQ Global Select
+        assert "NYQ" in YahooFinanceClient.US_EXCHANGES  # NYSE
+
+    @patch("yahoo_finance_client.requests.Session")
+    def test_get_earnings_calendar_filters_item_202(self, mock_session_cls):
+        """Only 8-K filings with item '2.02' are returned."""
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+        mock_session.headers = {}
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "hits": {
+                "total": {"value": 2},
+                "hits": [
+                    {
+                        "_source": {
+                            "items": ["2.02", "9.01"],
+                            "file_date": "2025-01-05",
+                            "display_names": ["APPLE INC  (AAPL)  (CIK 0000320193)"],
+                        }
+                    },
+                    {
+                        "_source": {
+                            "items": ["1.01"],  # not an earnings report
+                            "file_date": "2025-01-05",
+                            "display_names": ["OTHER CORP  (OTHR)  (CIK 0000111111)"],
+                        }
+                    },
+                ],
+            }
+        }
+        mock_session.get.return_value = mock_resp
+
+        client = YahooFinanceClient()
+        results = client.get_earnings_calendar("2025-01-05", "2025-01-05")
+
+        assert len(results) == 1
+        assert results[0]["symbol"] == "AAPL"
+        assert results[0]["date"] == "2025-01-05"
+        assert results[0]["time"] == "unknown"
+
+    @patch("yahoo_finance_client.requests.Session")
+    def test_get_earnings_calendar_deduplicates(self, mock_session_cls):
+        """Same ticker appearing in multiple filings is returned once."""
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+        mock_session.headers = {}
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "hits": {
+                "total": {"value": 2},
+                "hits": [
+                    {
+                        "_source": {
+                            "items": ["2.02"],
+                            "file_date": "2025-01-05",
+                            "display_names": ["AAPL CORP  (AAPL)  (CIK 0000000001)"],
+                        }
+                    },
+                    {
+                        "_source": {
+                            "items": ["2.02"],
+                            "file_date": "2025-01-05",
+                            "display_names": ["AAPL CORP  (AAPL)  (CIK 0000000001)"],
+                        }
+                    },
+                ],
+            }
+        }
+        mock_session.get.return_value = mock_resp
+
+        client = YahooFinanceClient()
+        results = client.get_earnings_calendar("2025-01-05", "2025-01-05")
+
+        assert len(results) == 1
+
+    @patch("yahoo_finance_client.yf.Ticker")
+    def test_get_historical_prices_most_recent_first(self, mock_ticker_cls):
+        """get_historical_prices returns rows in most-recent-first order."""
+        import pandas as pd
+
+        mock_ticker = MagicMock()
+        mock_ticker_cls.return_value = mock_ticker
+
+        dates = pd.to_datetime(["2025-01-03", "2025-01-06", "2025-01-07"])
+        hist = pd.DataFrame(
+            {
+                "Open": [100.0, 102.0, 104.0],
+                "High": [101.0, 103.0, 105.0],
+                "Low": [99.0, 101.0, 103.0],
+                "Close": [100.5, 102.5, 104.5],
+                "Volume": [1_000_000, 1_100_000, 1_200_000],
+            },
+            index=dates,
+        )
+        mock_ticker.history.return_value = hist
+
+        client = YahooFinanceClient()
+        result = client.get_historical_prices("AAPL", days=3)
+
+        assert result is not None
+        rows = result["historical"]
+        assert rows[0]["date"] == "2025-01-07"  # most recent first
+        assert rows[-1]["date"] == "2025-01-03"
+        assert rows[0]["close"] == 104.5
+
+    @patch("yahoo_finance_client.yf.Ticker")
+    def test_get_historical_prices_empty_returns_none(self, mock_ticker_cls):
+        """Empty DataFrame from yfinance -> None."""
+        import pandas as pd
+
+        mock_ticker = MagicMock()
+        mock_ticker_cls.return_value = mock_ticker
+        mock_ticker.history.return_value = pd.DataFrame()
+
+        client = YahooFinanceClient()
+        result = client.get_historical_prices("FAKE", days=250)
+        assert result is None
+
+    @patch("yahoo_finance_client.yf.Ticker")
+    def test_get_historical_prices_cached(self, mock_ticker_cls):
+        """Second call with same args uses cache, not yfinance."""
+        import pandas as pd
+
+        mock_ticker = MagicMock()
+        mock_ticker_cls.return_value = mock_ticker
+
+        dates = pd.to_datetime(["2025-01-03"])
+        hist = pd.DataFrame(
+            {"Open": [100.0], "High": [101.0], "Low": [99.0], "Close": [100.5], "Volume": [1_000_000]},
+            index=dates,
+        )
+        mock_ticker.history.return_value = hist
+
+        client = YahooFinanceClient()
+        client.get_historical_prices("SPY", days=1)
+        client.get_historical_prices("SPY", days=1)  # second call
+
+        # Ticker.history called only once (cache hit on second)
+        assert mock_ticker.history.call_count == 1
+
+    @patch("yahoo_finance_client.yf.Ticker")
+    def test_get_company_profiles_from_quotes_extracts_data(self, mock_ticker_cls):
+        """Profile extraction fetches data via Ticker.info (EDGAR entries have empty _yf_quote)."""
+        mock_ticker = MagicMock()
+        mock_ticker_cls.return_value = mock_ticker
+        mock_ticker.info = {
+            "marketCap": 3_000_000_000_000,
+            "exchange": "NMS",
+            "longName": "Apple Inc.",
+            "sector": "Technology",
+            "industry": "Consumer Electronics",
+            "currentPrice": 195.0,
+        }
+
+        client = YahooFinanceClient()
+        entries = [
+            {
+                "symbol": "AAPL",
+                "date": "2025-01-05",
+                "time": "unknown",
+                "_yf_quote": {},
+            }
+        ]
+        profiles = client.get_company_profiles_from_quotes(entries)
+        assert "AAPL" in profiles
+        p = profiles["AAPL"]
+        assert p["mktCap"] == 3_000_000_000_000
+        assert p["exchangeShortName"] == "NMS"
+        assert p["companyName"] == "Apple Inc."
+        assert p["sector"] == "Technology"
+        assert p["price"] == 195.0
 
 
 # ===========================================================================

@@ -11,9 +11,10 @@ Analyzes recent post-earnings stocks using a 5-factor scoring system:
 
 Scores each stock 0-100 and assigns A/B/C/D grades.
 
-4-Phase Pipeline:
-  Phase 1:   Fetch earnings calendar, profiles, filter by market cap + US exchange
-  Phase 1.5: Budget check - estimate remaining API calls, trim if needed
+Data source: Yahoo Finance via yfinance (free, no API key required).
+
+3-Phase Pipeline:
+  Phase 1:   Fetch earnings calendar + profiles, filter by market cap + US exchange
   Phase 2:   Fetch historical daily prices (250 days) for each candidate
   Phase 3:   Score all 5 factors, composite score, grade, optional entry filter
   Phase 4:   Generate JSON + Markdown reports
@@ -37,13 +38,13 @@ from calculators.ma50_calculator import calculate_ma50_position
 from calculators.ma200_calculator import calculate_ma200_position
 from calculators.pre_earnings_trend_calculator import calculate_pre_earnings_trend
 from calculators.volume_trend_calculator import calculate_volume_trend
-from fmp_client import ApiCallBudgetExceeded, FMPClient
 from report_generator import generate_json_report, generate_markdown_report
 from scorer import calculate_composite_score
+from yahoo_finance_client import YahooFinanceClient
 
 
 def normalize_timing(time_value):
-    """Normalize FMP time field to bmo/amc/unknown."""
+    """Normalize timing field to bmo/amc/unknown."""
     if not time_value:
         return "unknown"
     t = time_value.lower().strip()
@@ -120,9 +121,6 @@ def main():
         description="Earnings Trade Analyzer - 5-Factor Post-Earnings Scoring"
     )
     parser.add_argument(
-        "--api-key", type=str, default=None, help="FMP API key (or set FMP_API_KEY env var)"
-    )
-    parser.add_argument(
         "--lookback-days", type=int, default=2, help="Days back for earnings (default: 2)"
     )
     parser.add_argument(
@@ -133,10 +131,10 @@ def main():
     )
     parser.add_argument("--min-gap", type=float, default=0, help="Minimum gap %% (default: 0)")
     parser.add_argument(
-        "--max-api-calls",
+        "--max-candidates",
         type=int,
-        default=200,
-        help="API call budget (default: 200)",
+        default=0,
+        help="Max candidates to score (0 = unlimited, default: 0)",
     )
     parser.add_argument(
         "--apply-entry-filter",
@@ -153,15 +151,11 @@ def main():
 
     args = parser.parse_args()
 
-    # Initialize FMP client
-    try:
-        client = FMPClient(api_key=args.api_key, max_api_calls=args.max_api_calls)
-    except ValueError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
+    client = YahooFinanceClient()
 
     print("=" * 60, file=sys.stderr)
     print("Earnings Trade Analyzer - 5-Factor Scoring", file=sys.stderr)
+    print("Data source: Yahoo Finance (free, no API key required)", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
 
     # Phase 1: Fetch earnings calendar and profiles
@@ -173,48 +167,40 @@ def main():
 
     print(f"Date range: {from_date} to {to_date}", file=sys.stderr)
 
-    try:
-        earnings = client.get_earnings_calendar(from_date, to_date)
-    except ApiCallBudgetExceeded as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
+    earnings = client.get_earnings_calendar(from_date, to_date)
 
     if not earnings:
-        print("ERROR: No earnings data returned from API.", file=sys.stderr)
+        print("ERROR: No earnings data returned.", file=sys.stderr)
         sys.exit(1)
 
     print(f"Raw earnings announcements: {len(earnings)}", file=sys.stderr)
 
-    # Get unique symbols
-    symbols = list(set(e.get("symbol") for e in earnings if e.get("symbol")))
-    print(f"Unique symbols: {len(symbols)}", file=sys.stderr)
-
-    # Fetch profiles in batch
-    print("Fetching company profiles...", file=sys.stderr)
-    try:
-        profiles = client.get_company_profiles(symbols)
-    except ApiCallBudgetExceeded as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
-
+    # Extract profiles from screener data (no extra API calls needed)
+    print("Extracting company profiles...", file=sys.stderr)
+    profiles = client.get_company_profiles_from_quotes(earnings)
     print(f"Profiles retrieved: {len(profiles)}", file=sys.stderr)
 
     # Filter by market cap and US exchange
     candidates = []
+    seen = set()
     for earning in earnings:
         symbol = earning.get("symbol")
-        if not symbol or symbol not in profiles:
+        if not symbol or symbol in seen:
             continue
 
-        profile = profiles[symbol]
+        profile = profiles.get(symbol)
+        if not profile:
+            continue
+
         market_cap = profile.get("mktCap", 0)
         exchange = profile.get("exchangeShortName", "")
 
         if market_cap < args.min_market_cap:
             continue
-        if exchange not in FMPClient.US_EXCHANGES:
+        if exchange not in YahooFinanceClient.US_EXCHANGES:
             continue
 
+        seen.add(symbol)
         timing = normalize_timing(earning.get("time"))
         candidates.append(
             {
@@ -229,41 +215,17 @@ def main():
             }
         )
 
-    # Deduplicate by symbol (keep first occurrence)
-    seen = set()
-    unique_candidates = []
-    for c in candidates:
-        if c["symbol"] not in seen:
-            seen.add(c["symbol"])
-            unique_candidates.append(c)
-    candidates = unique_candidates
-
     print(f"Candidates after filtering: {len(candidates)}", file=sys.stderr)
 
     if not candidates:
         print("No candidates found matching criteria.", file=sys.stderr)
         sys.exit(0)
 
-    # Phase 1.5: Budget check
-    print("\n--- Phase 1.5: Budget Check ---", file=sys.stderr)
-    remaining_calls = args.max_api_calls - client.api_calls_made
-    estimated_calls = len(candidates)  # 1 historical price call per candidate
-
-    if estimated_calls > remaining_calls:
-        print(
-            f"WARNING: Estimated {estimated_calls} calls needed, "
-            f"but only {remaining_calls} remaining in budget.",
-            file=sys.stderr,
-        )
-        # Trim candidates by market cap (descending) to fit budget
+    # Optionally cap candidates (sort by market cap descending)
+    if args.max_candidates and args.max_candidates > 0 and len(candidates) > args.max_candidates:
         candidates.sort(key=lambda x: x.get("market_cap", 0), reverse=True)
-        candidates = candidates[:remaining_calls]
-        print(f"Trimmed to {len(candidates)} candidates (by market cap).", file=sys.stderr)
-    else:
-        print(
-            f"Budget OK: {estimated_calls} calls needed, {remaining_calls} remaining.",
-            file=sys.stderr,
-        )
+        candidates = candidates[: args.max_candidates]
+        print(f"Capped to {len(candidates)} candidates (by market cap).", file=sys.stderr)
 
     # Phase 2: Fetch historical prices
     print("\n--- Phase 2: Fetch Historical Prices ---", file=sys.stderr)
@@ -277,17 +239,9 @@ def main():
             end="",
         )
 
-        try:
-            price_data = client.get_historical_prices(symbol, days=250)
-        except ApiCallBudgetExceeded:
-            print(
-                f"\nWARNING: API budget exceeded at {symbol}. "
-                f"Proceeding with {len(results)} results.",
-                file=sys.stderr,
-            )
-            break
-
+        price_data = client.get_historical_prices(symbol, days=250)
         daily_prices = price_data.get("historical") if price_data else None
+
         if not daily_prices or len(daily_prices) < 50:
             print(
                 f" SKIP (insufficient data: {len(daily_prices) if daily_prices else 0} days)",
@@ -366,7 +320,8 @@ def main():
     metadata = {
         "generated_at": datetime.now().isoformat(),
         "generator": "earnings-trade-analyzer",
-        "generator_version": "1.0.0",
+        "generator_version": "2.0.0",
+        "data_source": "yahoo_finance",
         "lookback_days": args.lookback_days,
         "total_screened": len(all_results),
         "min_market_cap": args.min_market_cap,
@@ -386,10 +341,7 @@ def main():
 
     print(f"JSON report: {json_path}", file=sys.stderr)
     print(f"Markdown report: {md_path}", file=sys.stderr)
-    print(
-        f"API calls used: {api_stats['api_calls_made']}/{api_stats['max_api_calls']}",
-        file=sys.stderr,
-    )
+    print(f"API calls used: {api_stats['api_calls_made']}", file=sys.stderr)
     print("Done.", file=sys.stderr)
 
 

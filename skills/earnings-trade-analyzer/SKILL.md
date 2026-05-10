@@ -16,9 +16,12 @@ Analyze recent post-earnings stocks using a 5-factor weighted scoring system to 
 
 ## Prerequisites
 
-- FMP API key (set `FMP_API_KEY` environment variable or pass `--api-key`)
-- Free tier (250 calls/day) is sufficient for default screening (lookback 2 days, top 20)
-- Paid tier recommended for larger lookback windows or full screening
+- `yfinance` Python library: `pip install yfinance` (free, no API key required)
+- Internet access to SEC EDGAR (earnings calendar) and Yahoo Finance (price/profile data)
+
+**No API key needed.** Data sources:
+- **Earnings calendar:** SEC EDGAR 8-K Item 2.02 filings (companies must file within 4 business days of reporting)
+- **Historical prices & company profiles:** Yahoo Finance via yfinance
 
 ## Workflow
 
@@ -27,7 +30,7 @@ Analyze recent post-earnings stocks using a 5-factor weighted scoring system to 
 Execute the analyzer script:
 
 ```bash
-# Default: last 2 days of earnings, top 20 results
+# Default: last 2 days of earnings, top 20 results (no API key needed)
 python3 skills/earnings-trade-analyzer/scripts/analyze_earnings_trades.py --output-dir reports/
 
 # Custom lookback and market cap filter
@@ -37,9 +40,10 @@ python3 skills/earnings-trade-analyzer/scripts/analyze_earnings_trades.py \
   --top 30 \
   --output-dir reports/
 
-# With entry quality filter
+# With entry quality filter and candidate cap
 python3 skills/earnings-trade-analyzer/scripts/analyze_earnings_trades.py \
   --apply-entry-filter \
+  --max-candidates 100 \
   --output-dir reports/
 ```
 
