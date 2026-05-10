@@ -1,112 +1,76 @@
 #!/usr/bin/env python3
 """
-Test FMP institutional-holder endpoint availability
-Critical decision point for Phase 2 implementation
+Probe FMP stable institutional-ownership endpoints to find the working URL.
+Run this after any FMP API migration to confirm which path is live.
+
+Usage:
+    python3 check_institutional_endpoint.py
+    python3 check_institutional_endpoint.py --symbol MSFT
 """
 
+import argparse
 import os
 import sys
 
 import requests
 
+BASE = "https://financialmodelingprep.com"
 
-def check_institutional_endpoint():
-    """
-    Test if institutional-holder endpoint is available with current API key
+CANDIDATES = [
+    f"{BASE}/stable/institutional-ownership/institutional-holders-by-company",
+    f"{BASE}/stable/institutional-holder",
+    f"{BASE}/stable/institutional-ownership",
+]
 
-    Returns:
-        bool: True if endpoint available (Full Implementation)
-              False if endpoint restricted (Fallback Implementation)
-    """
-    # Get API key
+
+def probe(url: str, symbol: str, api_key: str) -> tuple[int, object]:
+    try:
+        r = requests.get(url, params={"symbol": symbol}, headers={"apikey": api_key}, timeout=10)
+        try:
+            body = r.json()
+        except Exception:
+            body = r.text[:200]
+        return r.status_code, body
+    except requests.exceptions.RequestException as e:
+        return -1, str(e)
+
+
+def check_institutional_endpoint(symbol: str = "AAPL") -> str | None:
+    """Probe candidate stable URLs and return the first working one, or None."""
     api_key = os.environ.get("FMP_API_KEY")
-
     if not api_key:
         print("ERROR: FMP_API_KEY environment variable not set")
-        print("Please set it with: export FMP_API_KEY=your_key")
-        return False
+        return None
 
-    print(f"Testing institutional-holder endpoint with API key (length: {len(api_key)})...")
-    print()
+    print(f"Probing institutional-holder stable endpoints for {symbol}...\n")
 
-    # Test institutional-holder endpoint
-    test_symbol = "AAPL"
-    url = f"https://financialmodelingprep.com/api/v3/institutional-holder/{test_symbol}"
-
-    try:
-        response = requests.get(url, headers={"apikey": api_key}, timeout=10)
-
-        print(f"Status Code: {response.status_code}")
-        print(f"Response length: {len(response.text)} bytes")
-        print()
-
-        if response.status_code == 200:
-            # Parse JSON
-            data = response.json()
-
-            # Check if it's an error message
-            if isinstance(data, dict) and "Error Message" in data:
-                print("❌ RESULT: Endpoint RESTRICTED")
-                print(f"   Error: {data['Error Message']}")
-                print()
-                print("DECISION: Use Fallback Implementation (Step 3B)")
-                print("  - I component will use Profile API institutionalOwnership field only")
-                print("  - Score capped at 70/100")
-                print("  - Quality warning will be added to all results")
-                return False
-
-            # Check if data is valid
-            if isinstance(data, list) and len(data) > 0:
-                print("✅ RESULT: Endpoint AVAILABLE")
-                print(f"   Found {len(data)} institutional holders for {test_symbol}")
-                print()
-                print("Sample data:")
-                for i, holder in enumerate(data[:3]):
-                    print(
-                        f"  {i + 1}. {holder.get('holder', 'N/A')}: "
-                        f"{holder.get('shares', 0):,} shares"
-                    )
-                print()
-                print("DECISION: Use Full Implementation (Step 3A)")
-                print("  - Full institutional analysis with holder count and ownership %")
-                print("  - Superinvestor detection")
-                print("  - Score range: 0-100")
-                return True
-            else:
-                print("⚠️  RESULT: Unexpected response format")
-                print(f"   Data type: {type(data)}")
-                print(f"   Data: {data}")
-                print()
-                print("DECISION: Use Fallback Implementation (Step 3B) as precaution")
-                return False
-
-        elif response.status_code == 401 or response.status_code == 403:
-            print("❌ RESULT: Endpoint RESTRICTED (401/403)")
-            print()
-            print("DECISION: Use Fallback Implementation (Step 3B)")
-            return False
+    working_url = None
+    for url in CANDIDATES:
+        status, body = probe(url, symbol, api_key)
+        if status == 200 and isinstance(body, list) and body:
+            print(f"✅  {status}  {url}")
+            print(f"     {len(body)} records  —  sample keys: {list(body[0].keys())[:6]}")
+            if working_url is None:
+                working_url = url
+        elif status == 200:
+            print(f"⚠️   {status}  {url}  (empty or wrong shape: {type(body).__name__})")
         else:
-            print(f"⚠️  RESULT: Unexpected status code {response.status_code}")
-            print()
-            print("DECISION: Use Fallback Implementation (Step 3B) as precaution")
-            return False
+            snippet = str(body)[:120] if body else ""
+            print(f"❌  {status}  {url}  {snippet}")
 
-    except requests.exceptions.RequestException as e:
-        print(f"❌ ERROR: Request failed - {e}")
-        print()
-        print("DECISION: Use Fallback Implementation (Step 3B)")
-        return False
+    print()
+    if working_url:
+        print(f"Working URL: {working_url}")
+        print(f"\nUpdate shared/fmp_base.py get_institutional_holders() to use this path.")
+    else:
+        print("No working endpoint found — institutional data unavailable on this subscription.")
+    return working_url
 
 
 if __name__ == "__main__":
-    print("=" * 70)
-    print("FMP Institutional-Holder Endpoint Availability Test")
-    print("=" * 70)
-    print()
+    parser = argparse.ArgumentParser(description="Probe FMP institutional-holder stable endpoints")
+    parser.add_argument("--symbol", default="AAPL", help="Symbol to test (default: AAPL)")
+    args = parser.parse_args()
 
-    result = check_institutional_endpoint()
-
-    print()
-    print("=" * 70)
-
+    result = check_institutional_endpoint(args.symbol)
     sys.exit(0 if result else 1)
