@@ -59,6 +59,30 @@ SUPERINVESTORS = [
 ]
 
 
+def _score_from_ownership_pct_only(ownership_pct: float, symbol: str) -> dict:
+    """Score I-component from Finviz ownership % alone (no holder count available)."""
+    if 30 <= ownership_pct <= 60:
+        score = 75
+    elif 20 <= ownership_pct < 30 or 60 < ownership_pct <= 70:
+        score = 60
+    elif 10 <= ownership_pct < 20 or 70 < ownership_pct <= 80:
+        score = 40
+    else:
+        score = 20
+    return {
+        "score": score,
+        "num_holders": None,
+        "ownership_pct": ownership_pct,
+        "superinvestor_present": False,
+        "superinvestors": [],
+        "total_shares_held": None,
+        "shares_outstanding": None,
+        "interpretation": f"Finviz fallback: {ownership_pct:.1f}% institutional ownership (no holder count)",
+        "quality_warning": "FMP 13F data requires Ultimate plan; scored from Finviz ownership % only.",
+        "data_source": "Finviz",
+    }
+
+
 def calculate_institutional_sponsorship(
     institutional_holders: list[dict],
     profile: Optional[dict] = None,
@@ -94,8 +118,21 @@ def calculate_institutional_sponsorship(
         >>> result = calculate_institutional_sponsorship(holders, profile)
         >>> print(f"I Score: {result['score']}, Holders: {result['num_holders']}, Ownership: {result['ownership_pct']:.1f}%")
     """
-    # Validate input
+    # When FMP holder list is unavailable, try Finviz directly for ownership %
     if not institutional_holders:
+        if use_finviz_fallback and FINVIZ_AVAILABLE and symbol:
+            try:
+                finviz_client = FinvizStockClient(rate_limit_seconds=1.0)
+                finviz_data = finviz_client.get_institutional_ownership(symbol)
+                if finviz_data and finviz_data.get("inst_own_pct") is not None:
+                    ownership_pct = finviz_data["inst_own_pct"]
+                    print(
+                        f"✅ Using Finviz institutional ownership for {symbol}: {ownership_pct:.1f}%",
+                        file=sys.stderr,
+                    )
+                    return _score_from_ownership_pct_only(ownership_pct, symbol)
+            except Exception as e:
+                print(f"WARNING: Finviz fallback failed for {symbol}: {e}", file=sys.stderr)
         return {
             "score": 0,
             "error": "No institutional holder data available",
