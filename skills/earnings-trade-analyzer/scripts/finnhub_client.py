@@ -77,6 +77,7 @@ class FinnhubClient:
                 "date": entry.get("date", ""),
                 "time": entry.get("hour", ""),
                 "revenueEstimate": entry.get("revenueEstimate") or 0,
+                "revenueActual": entry.get("revenueActual") or 0,
             })
 
         self.cache[cache_key] = results

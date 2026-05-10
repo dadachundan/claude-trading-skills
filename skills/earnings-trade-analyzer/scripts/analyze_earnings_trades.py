@@ -210,7 +210,10 @@ def main():
     # Pre-filter by revenue estimate to reduce profile API calls
     if args.min_revenue and args.min_revenue > 0:
         before = len(earnings)
-        earnings = [e for e in earnings if e.get("revenueEstimate", 0) >= args.min_revenue]
+        earnings = [
+            e for e in earnings
+            if max(e.get("revenueEstimate") or 0, e.get("revenueActual") or 0) >= args.min_revenue
+        ]
         print(f"Revenue filter (>=${args.min_revenue/1e9:.1f}B): {before} → {len(earnings)} symbols", file=sys.stderr)
 
     print("Fetching company profiles (Yahoo Finance batch)...", file=sys.stderr)
