@@ -204,13 +204,20 @@ class YahooFinanceClient:
                     "exchangeShortName": exchange,
                     "price": getattr(fi, "last_price", 0) or 0,
                 }
-            except Exception:
+            except Exception as e:
+                print(f"  WARNING: fast_info failed for {symbol}: {e}", file=sys.stderr)
                 return symbol, None
 
         with ThreadPoolExecutor(max_workers=self.PROFILE_WORKERS) as ex:
             for symbol, data in ex.map(_fast_one, uncached):
                 if data:
                     fast_profiles[symbol] = data
+
+        print(f"  Phase 1 complete: {len(fast_profiles)}/{len(uncached)} symbols returned data", file=sys.stderr)
+
+        us_count = sum(1 for p in fast_profiles.values() if p["country"] == "US")
+        large_cap_count = sum(1 for p in fast_profiles.values() if p["country"] == "US" and p["mktCap"] >= 1_000_000_000)
+        print(f"  US exchange: {us_count}, US $1B+: {large_cap_count}", file=sys.stderr)
 
         # Phase 2: full info for US candidates above $1B to get name/sector
         enrich_targets = [
